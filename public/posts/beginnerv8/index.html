@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html><head lang="en"><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=65350&amp;path=livereload" data-no-instant defer></script>
+	<meta charset="utf-8" />
+	<meta http-equiv="X-UA-Compatible" content="IE=edge"><title>A beginners guide to v8 - Ojas Gupta Blog</title><meta name="viewport" content="width=device-width, initial-scale=1">
+	<meta name="description" content="Still thinking" />
+	<meta property="og:image" content=""/>
+	<meta property="og:url" content="http://localhost:65350/posts/beginnerv8/">
+  <meta property="og:site_name" content="Ojas Gupta Blog">
+  <meta property="og:title" content="A beginners guide to v8">
+  <meta property="og:description" content="Still thinking">
+  <meta property="og:locale" content="en_us">
+  <meta property="og:type" content="article">
+    <meta property="article:section" content="posts">
+    <meta property="article:published_time" content="2025-06-19T15:00:00+10:00">
+    <meta property="article:modified_time" content="2025-06-19T15:00:00+10:00">
+
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="A beginners guide to v8">
+  <meta name="twitter:description" content="Still thinking">
+
+        <link href="http://localhost:65350/css/fonts.2c2227b81b1970a03e760aa2e6121cd01f87c88586803cbb282aa224720a765f.css" rel="stylesheet">
+	
+
+	
+	<link rel="stylesheet" type="text/css" media="screen" href="http://localhost:65350/css/main.6a0f23ea50fd34b46fee262a5a68e17d458c51a2bc99ba1ba018065de6b180c3.css" />
+</head>
+<body>
+        <div class="content"><header>
+	<div class="main">
+		<a href="http://localhost:65350/">Ojas Gupta Blog</a>
+	</div>
+	<nav>
+		
+		
+	</nav>
+</header>
+
+<main>
+  <article>
+    <div class="post-container">
+      
+      <div class="post-content">
+        <div class="title">
+          <h1 class="title">A beginners guide to v8</h1>
+          <div class="meta">Posted on Jun 19, 2025 <span class="draft-label">DRAFT</span> </div>
+        </div>
+        
+        <section class="body">
+          <h2 id="introduction-to-the-topic">Introduction to the topic</h2>
+<h2 id="object-representation">Object Representation</h2>
+<p>An object is a collection of properties, basically key value pairs.</p>
+<p><img src="image.png" alt="alt text"></p>
+<ul>
+<li>Most objects contain their properties in a single block of memory.</li>
+<li>Every block of memory has a pointer to a map which describes its structure</li>
+<li>If a property does not fit in a object then it is stored in an overflow array.</li>
+<li>Numbered properties are stored seperately, in a adjacent array</li>
+</ul>
+<p>You can access properties in two ways in JS.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-Javascript" data-lang="Javascript"><span style="display:flex;"><span><span style="color:#a6e22e">obj</span>.<span style="color:#a6e22e">prop</span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">obj</span>[<span style="color:#e6db74">&#34;prop&#34;</span>]
+</span></span></code></pre></div><p>Property names can only be strings, if you decide to use a number, it will be convereted to a string.
+As a result of this, we can do some funny business and have &ldquo;negative&rdquo; and &ldquo;decimal&rdquo; indexes for arrays.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-Javascript" data-lang="Javascript"><span style="display:flex;"><span><span style="color:#a6e22e">obj</span>[<span style="color:#ae81ff">1</span>];    <span style="color:#75715e">//
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span><span style="color:#a6e22e">obj</span>[<span style="color:#e6db74">&#34;1&#34;</span>];  <span style="color:#75715e">// names for the same property
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span><span style="color:#a6e22e">obj</span>[<span style="color:#ae81ff">1.0</span>];  <span style="color:#75715e">//
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">var</span> <span style="color:#a6e22e">o</span> <span style="color:#f92672">=</span> { <span style="color:#a6e22e">toString</span><span style="color:#f92672">:</span> <span style="color:#66d9ef">function</span> () { <span style="color:#66d9ef">return</span> <span style="color:#e6db74">&#34;-1.5&#34;</span>; } };
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">obj</span>[<span style="color:#f92672">-</span><span style="color:#ae81ff">1.5</span>];  <span style="color:#75715e">// also equivalent
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span><span style="color:#a6e22e">obj</span>[<span style="color:#a6e22e">o</span>];     <span style="color:#75715e">// since o is converted to string
+</span></span></span></code></pre></div><p>Javascript treats arrays as objects but they have a &ldquo;length&rdquo; property. So you can check the length of an array.</p>
+<h3 id="dictionary-mode-hash-tables">Dictionary Mode (Hash Tables)</h3>
+<p>Javascript also has a dictionary mode that it uses to objects when the optimized versions do work for a particular object.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span> 0:  map <span style="color:#f92672">(</span>string type<span style="color:#f92672">)</span>
+</span></span><span style="display:flex;"><span> 4:  length <span style="color:#f92672">(</span>in characters<span style="color:#f92672">)</span>
+</span></span><span style="display:flex;"><span> 8:  hash code <span style="color:#f92672">(</span>lazily computed<span style="color:#f92672">)</span>
+</span></span><span style="display:flex;"><span>12:  characters...
+</span></span></code></pre></div><p>Strings are immuatable except for the hash code field, that is lazily computed. Some strings are used to access properties are called &ldquo;symbols&rdquo;. These are &ldquo;uniquified&rdquo;. If a non-symbol string is used to access a property it is uniquified first.</p>
+<p>The &ldquo;symbol&rdquo; name can be used to access John, when we say obj[&ldquo;name&rdquo;] there is only one unique value assigned to this, which is &ldquo;John&rdquo; in this case.</p>
+<pre tabindex="0"><code>let obj = { name: &#34;John&#34; };
+console.log(obj[&#34;name&#34;]);  // or obj.name
+</code></pre><p>When a key-value pair is inserted into a hash table, the key&rsquo;s code is computed.</p>
+<h3 id="fast-in-object-properties">Fast, in-object properties</h3>
+<p>V8 uses maps. You can think of a map as a table of descriptors, with one entry for each property. Objects with the same structure will usually share the same map. Fully constructed instances of Point might share a map like the following:</p>
+<pre tabindex="0"><code>Map M2
+  object size: 20 (space for 2 properties)
+  &#34;x&#34;: FIELD at offset 12
+  &#34;y&#34;: FIELD at offset 16
+</code></pre><p>V8 handles this with special descriptors called transitions. When adding a new property, we don&rsquo;t want to create a new map for the object if we don&rsquo;t have to; we&rsquo;d rather use an existing map if one is available. Transition descriptors point to these other maps.</p>
+<pre tabindex="0"><code>&lt;Point object is allocated&gt;
+
+  Map M0
+    &#34;x&#34;: TRANSITION to M1 at offset 12
+
+this.x = x;
+
+  Map M1
+    &#34;x&#34;: FIELD at offset 12
+    &#34;y&#34;: TRANSITION to M2 at offset 16
+
+this.y = y;
+
+  Map M2
+    &#34;x&#34;: FIELD at offset 12
+    &#34;y&#34;: FIELD at offset 16
+</code></pre><p>It starts out with map M0, which has no fields. On the first assignment, the object&rsquo;s map pointer is set to M1, and the value x is stored at offset 12. On the second assignment, the map pointer is set to M2, and y is stored at offset 16.</p>
+<p>What if a new property is assigned later, to an object with map M2?</p>
+<pre tabindex="0"><code> Map M2
+   &#34;x&#34;: FIELD at offset 12
+   &#34;y&#34;: FIELD at offset 16
+   &#34;z&#34;: TRANSITION at offset 20
+
+this.z = z;
+
+  Map M3
+    &#34;x&#34;: FIELD at offset 12
+    &#34;y&#34;: FIELD at offset 16
+    &#34;z&#34;: FIELD at offset 20
+</code></pre><p>If that property has never been assigned before, we create M3, a copy of M2, and add a FIELD descriptor to it. We also add a TRANSITION descriptor to M2. Note that adding a transition is one of the only ways a map can be modified; maps are mostly immutable.</p>
+<p>What if properties are not always assigned in the same order? For example:</p>
+<pre tabindex="0"><code>function Point(x, y, reverse) {
+  if (reverse) {
+    this.x = x;
+    this.y = y;
+  } else {
+    this.y = x;
+    this.x = y;
+  }
+}
+</code></pre><p>In this case, we end up with a tree of transitions rather than a chain. The initial map (denoted M0 above) has two transitions; which one is taken depends on whether x or y is assigned first. Because of this divergence, not all Point objects will have the same map.</p>
+<p>V8 can handle minor divergences like this just fine, but if your code assigns all sorts of random properties to objects from the same constructor in no particular order, or if you delete properties, V8 will drop the object into dictionary mode, where properties are stored in a hash table. This prevents an absurd number of maps from being allocated.</p>
+<h4 id="in-object-slack-tracking">In-object slack tracking</h4>
+<p>V8 uses a process called in-object slack tracking to determine an appropriate size for instances of each constructor. This way V8 knows how much memory to reserve for an object.</p>
+<p>Initially, objects allocated by a constructor are given a generous amount of memory: enough for 32 fast properties stored within the object. Once a certain number of objects have been allocated from the same constructor (8, last time I checked), V8 checks the maximum size of these initial objects by traversing the transition tree from the initial map.</p>
+<p>When V8 (the JavaScript engine) creates objects, it doesn’t know in advance how many properties you&rsquo;ll add to them. For example:</p>
+<pre tabindex="0"><code>javascript
+Copy
+Edit
+function MyObject() {
+  this.a = 1;
+  this.b = 2;
+}
+</code></pre><p>Later you might start adding more properties dynamically:</p>
+<pre tabindex="0"><code>javascript
+Copy
+Edit
+let obj = new MyObject();
+obj.c = 3;
+obj.d = 4;
+obj.e = 5;
+</code></pre><p>If V8 allocated too little memory, it would need to constantly resize (slow).</p>
+<p>If it allocated too much, it would waste memory (inefficient).</p>
+<p>✅ The Solution: In-Object Slack Tracking</p>
+<p>The initial objects are also resized using a clever trick. When the initial objects are first allocated, their fields are initialized such that they appear to the garbage collector to be free space.</p>
+<p>When the slack tracking process ends, the new instance size is written to maps in the transition tree, so objects with those maps effectively become smaller. The garbage collector doesn&rsquo;t actually treat them as free space, since the maps specify the size of the objects. However, when the slack tracking process ends, the new instance size is written to maps in the transition tree, so objects with those maps effectively become smaller. Since the unused fields already look like free space, the initial objects don&rsquo;t need to be modified.</p>
+<p>CHATGPT EXPLANATION OF THIS:
+Who tells the GC how big an object is?
+Every heap object in V8 carries a pointer to a Map (a “hidden-class”).
+The map contains an instance_size field: that number is the only thing the garbage collector trusts when it scans or moves the object.</p>
+<p>During the learning phase (in-object-slack tracking)</p>
+<p>First few objects created by a constructor get a generous instance_size that includes 32 unused “slack” property slots.</p>
+<p>Because the map says “this object is X bytes long”, the GC must treat those slack bytes as part of the object—even though they’re never read or written. They cannot be handed out to something else yet.</p>
+<p>After V8 has seen enough allocations (≈ 8 objects)</p>
+<p>V8 walks the transition tree to see the largest real property count that ever got used.</p>
+<p>It then rewrites the instance_size in every map along that tree to the new, smaller size (e.g. “only room for 5 in-object properties, not 32”).</p>
+<p>Analogy
+Think of booking a block of 32 seats for every new group at a restaurant just in case they bring friends.</p>
+<p>After watching eight groups you realise the largest party size is actually 5, so you update the table chart: “this group only owns seats 1-5”.</p>
+<p>Seats 6-32 were always empty; once the chart is updated the host can immediately assign those seats to new customers—no need to drag anybody to a new table.</p>
+<p>Now I&rsquo;m sure your next question is, &ldquo;what happens when a new property is added after in-object slack tracking is complete?&rdquo; This is handled by allocating an overflow array to store the extra properties. The overflow array can always be reallocated with a larger size as new properties are added.</p>
+<h4 id="methods-and-prototypes">Methods and prototypes</h4>
+<p>Methods in JavaScript are just regular old properties.
+In the example below, distance is just a property of Point objects. It points to the PointDistance function. Any JavaScript function can be called as a method and can access properties of its receiver, this.</p>
+<pre tabindex="0"><code>function Point(x, y) {
+  this.x = x;
+  this.y = y;
+  this.distance = PointDistance;
+}
+
+function PointDistance(p) {
+  var dx = this.x - p.x;
+  var dy = this.y - p.y;
+  return Math.sqrt(dx*dx + dy*dy);
+}
+</code></pre><p>If distance were treated like a normal in-object field, this would obviously waste a lot of memory, since every Point object would have an extra field that points to the same thing. This cost would be higher for objects with a lot of methods. We can do better.</p>
+<p>C++ solves this problem with v-tables. V-tables are arrays of pointers to virtual methods. Every object of a class with virtual methods has pointer to the v-table for that class.</p>
+<h2 id="pointer-tagging">Pointer Tagging</h2>
+<h2 id="pointer-compression">Pointer Compression</h2>
+<h2 id="elements">Elements</h2>
+<h2 id="v8s-isolate-and-context">V8&rsquo;s Isolate and Context</h2>
+<p>An Isolate is simply a concept of an instance or “virtual machine” which represents one JavaScript execution environment; including a heap manager, a garbage collector, etc.</p>
+<p>In Blink, isolates and threads have a 1:1 relationship, where one isolate is associated with the main thread and one isolate is associated with one worker thread.</p>
+<p>The Context corresponds to a global root object which holds the state of the VM and is used to compile and execute scripts in a single instance of V8.</p>
+<p>In relation to the isolate, the isolate and contexts have a 1:N relationship over the lifetime of the isolate - where that specific isolate or instance will interpret and compile multiple contexts.</p>
+<p>This means that each time JavaScript need to be executed, we need to validate that we are in the correct context via GetCurrentContext() or we’ll end up either leaking JavaScript objects or overwriting them, which potentially can cause a security issue.</p>
+<p>In Chrome, the runtime object v8::Isolate is implemented in v8/include/v8-isolate.h and the v8::Context object is implement in v8/include/v8-context.h. Using what we know, from a high-level, we can visualize the runtime and context inherence in Chrome to look like so:</p>
+<p><img src="image-1.png" alt="alt text"></p>
+<h2 id="ignition-interpreter">Ignition Interpreter</h2>
+<p>When Ignition compiles bytecode, it also collects profiling and feedback data each time a JavaScript function is run. This feedback data is then used by TurboFan to generate JIT optimized machine code.</p>
+<p>Each bytecode specifies its inputs and outputs as register operands, so we sort of need to know where these inputs and outputs will go on the stack.</p>
+<h3 id="understanding-the-register-based-machine">Understanding the Register-Based Machine</h3>
+<p>These “registers” aren’t actually traditional machine registers as one would think. Instead, they are specific slots in a register file which is allocated as part of a function’s stack frame - in essence they are “virtual” registers.</p>
+<p>Ignition consists of a set of bytecode handlers which are written in a high-level, machine agnostic assembly code. These handlers are implemented by the CodeStubAssembler class and compiled by using TurboFan’s backend when the browser is compiled.</p>
+<p>Overall, each of these handlers “handles” a specific bytecode and then dispatches to the next bytecode’s respective handler.</p>
+<p>An example of the LdaZero or “Load Zero to Accumulator” bytecode handler from v8/src/interpreter/interpreter-generator.cc can be seen below.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-C" data-lang="C"><span style="display:flex;"><span><span style="color:#75715e">// LdaZero
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e">// Load literal &#39;0&#39; into the accumulator.
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span><span style="color:#a6e22e">IGNITION_HANDLER</span>(LdaZero, InterpreterAssembler) 
+</span></span><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>  TNode<span style="color:#f92672">&lt;</span>Number<span style="color:#f92672">&gt;</span> zero_value <span style="color:#f92672">=</span> <span style="color:#a6e22e">NumberConstant</span>(<span style="color:#ae81ff">0.0</span>);
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">SetAccumulator</span>(zero_value);
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">Dispatch</span>();
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>When V8 creates a new isolate, it will load the handlers from a snapshot file that was created during build time. The isolate will also contain a global interpreter dispatch table which holds a code object pointer to each bytecode handler, as indexed by the bytecode value. Generally, this dispatch table is simply just an enum.</p>
+<p>In order for the bytecode to be run by Ignition, the JavaScript function is first translated to bytecode from its AST by a BytecodeGenerator. This generator walks the AST and emits the appropriate bytecode per each AST node by calling the GenerateBytecode function.</p>
+<p>This bytecode is then associated with the function (which is a JSFunction object) in a property field known as the SharedFunctionInfo object. Afterwards, the JavaScript functions code_entry_point is set to the InterpreterEntryTrampoline built-in stub.</p>
+<p>The InterpreterEntryTrampoline stub is entered when a JavaScript function is called, and is responsible for setting up the appropriate interpreter stack frame while also dispatching to the interpreter’s bytecode handler for the first bytecode of the function.</p>
+<p>This then starts the execution or “interpretation” of the function by Ignition which is handled within the v8/src/builtins/x64/builtins-x64.cc source file.</p>
+<p>So how does this stack frame get generated?</p>
+<p>Well, during bytecode generation, the BytecodeGenerator will also allocate registers in a function’s register file for local variables, context object pointers, and temporary values that are required for expression evaluation.</p>
+<p>The InterpreterEntryTrampoline stub handles the initial building of the stack frame, and then allocates space in the stack frame for the register file. This stub will also write undefined to all the registers in this register file so that the Garbage Collector (GC) doesn’t see any invalid (i.e., non-tagged) pointers when it walks the stack.</p>
+<h4 id="turbofan">TurboFan</h4>
+
+        </section>
+        <div class="post-tags">
+          
+          
+          
+        </div>
+      </div>
+
+      
+      
+    </div>
+
+    </article>
+</main>
+<footer>
+  <div style="display:flex"></div>
+  <div class="footer-info">
+    2025  <a
+      href="https://github.com/athul/archie">Archie Theme</a> | Built with <a href="https://gohugo.io">Hugo</a>
+  </div>
+</footer>
+
+</div>
+    </body>
+</html>

