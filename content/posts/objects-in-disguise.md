@@ -1,7 +1,7 @@
 +++
 title = 'Objects in Disguise 🥷🏽: Unmasking V8’s Secret Operations Behind the Scenes'
 date = 2025-06-19T15:00:00+10:00
-draft = true
+draft = false
 description = 'Discover how the V8 engine quietly morphs your JavaScript objects using hidden classes, inline caches, and other under the hood tricks.'
 +++
 
