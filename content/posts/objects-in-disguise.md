@@ -97,7 +97,7 @@ V8 will then process `d2` and `d3` from our code above resulting in the final di
 ![alt text](/img/final.png)
 
 
-Since we can see the offsets created, this strategy avoids a dictionary lookup of the object plus walking through the prototype and its prototypes and then its prototypes etc. Effectively simplifying our algorithm. 
+Since we can see the offsets, this strategy avoids a dictionary lookup of the object plus walking through the prototype and its prototypes and then its prototypes etc. Effectively simplifying our algorithm. 
 
 # Inline Caching
 
@@ -156,7 +156,7 @@ Here is a visual diagram of the entire process:
 
 
 
-If you would like a deeper look, here is the assembly code from Michael Stanton at Google:
+If you would like a deeper look, Michael Stanton from Google published this assembly from his talk "V8 and How It Listens to You":
 ![alt text](/img/inline-cache-assembly.png)
 
 
