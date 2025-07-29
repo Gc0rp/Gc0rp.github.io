@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html><head lang="en"><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=65350&amp;path=livereload" data-no-instant defer></script>
+<html><head lang="en"><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=59088&amp;path=livereload" data-no-instant defer></script>
 	<meta charset="utf-8" />
 	<meta http-equiv="X-UA-Compatible" content="IE=edge"><title>Objects in Disguise 🥷🏽: Unmasking V8’s Secret Operations Behind the Scenes - Ojas Gupta Blog</title><meta name="viewport" content="width=device-width, initial-scale=1">
 	<meta name="description" content="Discover how the V8 engine quietly morphs your JavaScript objects using hidden classes, inline caches, and other under the hood tricks." />
 	<meta property="og:image" content=""/>
-	<meta property="og:url" content="http://localhost:65350/posts/objects-in-disguise/">
+	<meta property="og:url" content="http://localhost:59088/posts/objects-in-disguise/">
   <meta property="og:site_name" content="Ojas Gupta Blog">
   <meta property="og:title" content="Objects in Disguise 🥷🏽: Unmasking V8’s Secret Operations Behind the Scenes">
   <meta property="og:description" content="Discover how the V8 engine quietly morphs your JavaScript objects using hidden classes, inline caches, and other under the hood tricks.">
@@ -18,16 +18,16 @@
   <meta name="twitter:title" content="Objects in Disguise 🥷🏽: Unmasking V8’s Secret Operations Behind the Scenes">
   <meta name="twitter:description" content="Discover how the V8 engine quietly morphs your JavaScript objects using hidden classes, inline caches, and other under the hood tricks.">
 
-        <link href="http://localhost:65350/css/fonts.2c2227b81b1970a03e760aa2e6121cd01f87c88586803cbb282aa224720a765f.css" rel="stylesheet">
+        <link href="http://localhost:59088/css/fonts.2c2227b81b1970a03e760aa2e6121cd01f87c88586803cbb282aa224720a765f.css" rel="stylesheet">
 	
 
 	
-	<link rel="stylesheet" type="text/css" media="screen" href="http://localhost:65350/css/main.6a0f23ea50fd34b46fee262a5a68e17d458c51a2bc99ba1ba018065de6b180c3.css" />
+	<link rel="stylesheet" type="text/css" media="screen" href="http://localhost:59088/css/main.6a0f23ea50fd34b46fee262a5a68e17d458c51a2bc99ba1ba018065de6b180c3.css" />
 </head>
 <body>
         <div class="content"><header>
 	<div class="main">
-		<a href="http://localhost:65350/">Ojas Gupta Blog</a>
+		<a href="http://localhost:59088/">Ojas Gupta Blog</a>
 	</div>
 	<nav>
 		
@@ -42,7 +42,7 @@
       <div class="post-content">
         <div class="title">
           <h1 class="title">Objects in Disguise 🥷🏽: Unmasking V8’s Secret Operations Behind the Scenes</h1>
-          <div class="meta">Posted on Jun 19, 2025 <span class="draft-label">DRAFT</span> </div>
+          <div class="meta">Posted on Jun 19, 2025</div>
         </div>
         
         <section class="body">
@@ -84,7 +84,7 @@ When the [[Get]] method of O is called with property name P, the following steps
 5. Call the [[Get]] method of [[Prototype]] with property name P.
 
 6. Return Result(5).
-</code></pre><p>As you can see property retrieval takes quite the number of instructions. For a more modern day algorithm, you can look at <a href="https://read262.jedfox.com/ordinary-and-exotic-objects-behaviours/ordinary-object-internal-methods-and-internal-slots/#sec-ordinaryget">https://read262.jedfox.com/ordinary-and-exotic-objects-behaviours/ordinary-object-internal-methods-and-internal-slots/#sec-ordinaryget</a> and scroll down to section 10.1.8 [[Get]] (P, Receiver).</p>
+</code></pre><p>As you can see property retrieval takes quite the number of instructions. For a more modern day algorithm, you can look at <a href="https://read262.jedfox.com/ordinary-and-exotic-objects-behaviours/ordinary-object-internal-methods-and-internal-slots/#sec-ordinaryget">this link</a> and scroll down to section 10.1.8 [[Get]] (P, Receiver).</p>
 <p>Now you may be wondering how hidden classes make property access faster?</p>
 <p>The reality is maps have the capacity to be computationally expensive which can slow down our applications. Through the use of hidden classes we can avoid a dictionary lookup when we access our properties and then combine them with a technique called inline caching (we will discuss this one later).</p>
 <p>Lets use our example code to show how hidden classes work:</p>

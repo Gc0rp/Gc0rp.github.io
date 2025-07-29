@@ -61,7 +61,7 @@ When the [[Get]] method of O is called with property name P, the following steps
 6. Return Result(5).
 ```
 
-As you can see property retrieval takes quite the number of instructions. For a more modern day algorithm, you can look at https://read262.jedfox.com/ordinary-and-exotic-objects-behaviours/ordinary-object-internal-methods-and-internal-slots/#sec-ordinaryget and scroll down to section 10.1.8 [[Get]] (P, Receiver).
+As you can see property retrieval takes quite the number of instructions. For a more modern day algorithm, you can look at [this link](https://read262.jedfox.com/ordinary-and-exotic-objects-behaviours/ordinary-object-internal-methods-and-internal-slots/#sec-ordinaryget) and scroll down to section 10.1.8 [[Get]] (P, Receiver).
 
 Now you may be wondering how hidden classes make property access faster?
 

