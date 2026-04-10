@@ -12,7 +12,7 @@ We will go through the basics of the unsafe unlink technique and practice on the
 ## The unlink process
 The unsafe unlink is a heap exploitation technique that allows us to unlink a heap chunk and achieve an arbitrary write. An arbitrary write will then be used to modify function hooks which are used to call functions. In our post we will target the `malloc` call to trigger the shell then modify the address `strlen` to `puts` for an info leak. 
 
-The pointer table in this CTF starts at 0x602140, all `malloc` calls are stored here. Our CTF by design does not restrict the amount of times we call `malloc`. Hence we can create hundreds of chunks. I decided to start with ten `0x80` sized chunks.
+The pointer table in this CTF starts at `0x602140`, all chunks created in this CTF will be stored here. Our CTF by design does not restrict the amount of times we call `malloc`. Hence we can create hundreds of chunks. I decided to start with ten `0x80` sized chunks.
 
 ```python
 add(0x80)
