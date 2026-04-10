@@ -7,14 +7,12 @@ description = "A writeup for the stkof challenge in hitcon 14, I will use the un
 
 ## Introduction
 
-In this blog post I’ll explain to how to solve this CTF and also show how the unsafe unlink attacks works. 
+We will go through the basics of the unsafe unlink technique and practice on the Hitcon'14 Stkof challenge. This CTF will use the version glibc-2.23.
 
 ## The unlink process
+The unsafe unlink is a heap exploitation technique that allows us to unlink a heap chunk and achieve an arbitrary write. An arbitrary write will then be used to modify function hooks which are used to call functions. In our post we will target the `malloc` call to trigger the shell then modify the address `strlen` to `puts` for an info leak. 
 
-The pointer table in this CTF is massive, so you can call malloc almost as many times as you want. I'll get into the details on how to locate the pointer table later. 
-
-I’ll start by adding ten `0x80` sized chunks for now. 
-
+The pointer table in this CTF starts at 0x602140, all `malloc` calls are stored here. Our CTF by design does not restrict the amount of times we call `malloc`. Hence we can create hundreds of chunks. I decided to start with ten `0x80` sized chunks.
 
 ```python
 add(0x80)
@@ -125,7 +123,6 @@ You can also see that our fake chunk has been added to the unsorted bin and the 
 
 
 ## Using the GOT Table to leak addresses
-
 
 Now that we have control over the pointer table, let's change some of the addresses. This time when we say “scan on the 5th index”, it will go to the address we have on the 5th index and start adding our data there. In our case it will start adding the strlen and malloc addresses from `0x602150`.
 
@@ -299,6 +296,7 @@ print ("oneshot gadget: " + hex(oneShot))
 # Call malloc
 scan(3, 0x8, p64(oneShot))
 target.send("1\n1\n")
+
 # Enjoy your shell!
 target.interactive()
 ```

